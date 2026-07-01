@@ -11,8 +11,7 @@ import { useRouter } from "expo-router";
 import { ShoppingBag, Minus, Plus, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
-
+import { api } from "@/utils/api";
 const bagItems = [
   {
     id: 1,
@@ -52,9 +51,7 @@ export default function Bag() {
     if (user) {
       try {
         setIsLoading(true);
-        const bag = await axios.get(
-          `https://myntra-clone-xj36.onrender.com/bag/${user._id}`
-        );
+        const bag = await api.get(`/bag/${user._id}`);
         setbag(bag.data);
       } catch (error) {
         console.log(error);
@@ -96,7 +93,7 @@ export default function Bag() {
   );
   const handledelete=async(itemid:any)=>{
     try {
-      await axios.delete(`https://myntra-clone-xj36.onrender.com/bag/${itemid}`)
+      await api.delete(`/bag/${itemid}`)
       fetchproduct();
     } catch (error) {
       console.log(error)

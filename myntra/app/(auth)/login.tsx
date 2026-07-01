@@ -15,18 +15,28 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isloading, setisloading] = useState(false);
   const handleLogin = async () => {
+    if (!identifier.trim() || !password) {
+      setErrorMessage("Please enter your email or username and password.");
+      return;
+    }
+
+    setErrorMessage("");
     try {
       setisloading(true);
-      await login(email, password);
-      router.replace("/(tabs)");
-    } catch (error) {
+      await login(identifier, password);
+      router.replace("/(tabs)/index");
+    } catch (error: any) {
       console.error(error);
+      const message =
+        error?.response?.data?.message || error?.message || "Login failed";
+      setErrorMessage(message);
     } finally {
       setisloading(false);
     }
@@ -43,18 +53,22 @@ export default function Login() {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Welcome to Myntra</Text>
         <Text style={styles.subtitle}>Login to continue shopping</Text>
+        <Text style={styles.inputLabel}>Email or Username</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
+          placeholder="Email or Username"
+          placeholderTextColor="#999"
+          value={identifier}
+          onChangeText={setIdentifier}
           autoCapitalize="none"
-          keyboardType="email-address"
+          keyboardType="default"
         />
+        <Text style={styles.inputLabel}>Password</Text>
         <View style={styles.passwordContainer}>
           <TextInput
             style={styles.passwordInput}
             placeholder="Password"
+            placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
@@ -71,9 +85,9 @@ export default function Login() {
           </TouchableOpacity>
         </View>
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, (!identifier.trim() || !password) && styles.disabledButton]}
           onPress={handleLogin}
-          disabled={isloading}
+          disabled={isloading || !identifier.trim() || !password}
         >
           {isloading ? (
             <ActivityIndicator color="#fff" />
@@ -81,6 +95,9 @@ export default function Login() {
             <Text style={styles.buttonText}>LOGIN</Text>
           )}
         </TouchableOpacity>
+        {errorMessage ? (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        ) : null}
 
         <TouchableOpacity
           style={styles.signupLink}
@@ -106,12 +123,17 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    marginTop: "60%",
+    justifyContent: "flex-start",
+    padding: 25,
+    backgroundColor: "rgba(255, 255, 255, 0.97)",
+    marginTop: "55%",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -5 },
+    elevation: 10,
   },
   title: {
     fontSize: 28,
@@ -122,7 +144,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: "#666",
-    marginBottom: 30,
+    marginBottom: 25,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: "#4a4a4a",
+    marginBottom: 8,
+    marginTop: 10,
+    fontWeight: "600",
   },
   input: {
     backgroundColor: "#f5f5f5",
@@ -152,6 +181,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginTop: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  errorText: {
+    color: "#ff3f6c",
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 14,
   },
   buttonText: {
     color: "#fff",

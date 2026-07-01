@@ -4,9 +4,19 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
   try {
-    const Wishlists = new Wishlist(req.body);
-    const saveitem = await Wishlists.save();
-    res.status(200).json(saveitem);
+    const { userId, productId } = req.body;
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "Missing required wishlist fields" });
+    }
+
+    const existingItem = await Wishlist.findOne({ userId, productId });
+    if (existingItem) {
+      return res.status(200).json(existingItem);
+    }
+
+    const wishlistItem = new Wishlist(req.body);
+    const savedItem = await wishlistItem.save();
+    res.status(201).json(savedItem);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });
@@ -15,10 +25,10 @@ router.post("/", async (req, res) => {
 
 router.get("/:userid", async (req, res) => {
   try {
-    const bag = await Wishlist.find({ userId: req.params.userid }).populate(
+    const items = await Wishlist.find({ userId: req.params.userid }).populate(
       "productId"
     );
-    res.status(200).json(bag);
+    res.status(200).json(items);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });

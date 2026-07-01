@@ -24,9 +24,15 @@ router.post("/signup", async (req, res) => {
   }
 });
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const escapedIdentifier = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const user = await User.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { fullName: { $regex: `^${escapedIdentifier}$`, $options: "i" } },
+      ],
+    });
     if (!user) return res.status(404).json({ message: "User not found" });
     const ismatch = await bcrypt.compare(password, user.password);
     if (!ismatch) return res.status(404).json({ message: "Invalid password" });

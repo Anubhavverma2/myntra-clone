@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
+import { api } from "@/utils/api";
 import { useRouter } from "expo-router";
 import { Heart, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -45,9 +45,7 @@ export default function Wishlist() {
     if (user) {
       try {
         setIsLoading(true);
-        const bag = await axios.get(
-          `https://myntra-clone-xj36.onrender.com/wishlist/${user._id}`
-        );
+        const bag = await api.get(`/wishlist/${user._id}`);
         setwishlist(bag.data);
       } catch (error) {
         console.log(error);
@@ -59,7 +57,7 @@ export default function Wishlist() {
   };
   const handledelete=async(itemid:any)=>{
     try {
-      await axios.delete(`https://myntra-clone-xj36.onrender.com/wishlist/${itemid}`)
+      await api.delete(`/wishlist/${itemid}`)
       fetchproduct();
     } catch (error) {
       console.log(error)
@@ -101,22 +99,31 @@ export default function Wishlist() {
       </View>
 
       <ScrollView style={styles.content}>
-        {wishlist?.map((item:any) => (
-          <View key={item._id} style={styles.wishlistItem}>
-            <Image  source={{ uri: item.productId.images[0] }} style={styles.itemImage} />
-            <View style={styles.itemInfo}>
-              <Text style={styles.brandName}>{item.productId.brand}</Text>
-              <Text style={styles.itemName}>{item.productId.name}</Text>
-              <View style={styles.priceContainer}>
-                <Text style={styles.price}>{item.productId.price}</Text>
-                <Text style={styles.discount}>{item.productId.discount}</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.removeButton} onPress={()=>handledelete(item._id)}>
-              <Trash2 size={24} color="#ff3f6c" />
-            </TouchableOpacity>
+        {wishlist && wishlist.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Your wishlist is empty.</Text>
+            <Text style={styles.emptySubtitle}>
+              Browse products and save your favorites here.
+            </Text>
           </View>
-        ))}
+        ) : (
+          wishlist?.map((item:any) => (
+            <View key={item._id} style={styles.wishlistItem}>
+              <Image source={{ uri: item.productId.images[0] }} style={styles.itemImage} />
+              <View style={styles.itemInfo}>
+                <Text style={styles.brandName}>{item.productId.brand}</Text>
+                <Text style={styles.itemName}>{item.productId.name}</Text>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.price}>₹{item.productId.price}</Text>
+                  <Text style={styles.discount}>{item.productId.discount}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.removeButton} onPress={()=>handledelete(item._id)}>
+                <Trash2 size={24} color="#ff3f6c" />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
       </ScrollView>
     </View>
   );

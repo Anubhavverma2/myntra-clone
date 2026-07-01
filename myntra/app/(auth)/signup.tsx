@@ -63,19 +63,25 @@ export default function Signup() {
     return isValid;
   };
 
+  const [errorMessage, setErrorMessage] = useState("");
+
   const handleSignup = async () => {
-    if (validateForm()) {
-      // Here you would typically make an API call to register the user
-      try {
-        setisloading(true);
-        await Signup(formData.fullName, formData.email, formData.password);
-        router.replace("/(tabs)");
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setisloading(false);
-      }
-      router.replace("/(tabs)");
+    if (!validateForm()) {
+      return;
+    }
+
+    setErrorMessage("");
+    try {
+      setisloading(true);
+      await Signup(formData.fullName, formData.email, formData.password);
+      router.replace("/(tabs)/index");
+    } catch (error: any) {
+      console.error(error);
+      const message =
+        error?.response?.data?.message || error?.message || "Signup failed";
+      setErrorMessage(message);
+    } finally {
+      setisloading(false);
     }
   };
 
@@ -157,7 +163,7 @@ export default function Signup() {
           ) : null}
         </View>
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, isloading && styles.disabledButton]}
           onPress={handleSignup}
           disabled={isloading}
         >
@@ -167,6 +173,9 @@ export default function Signup() {
             <Text style={styles.buttonText}>SIGN UP</Text>
           )}
         </TouchableOpacity>
+        {errorMessage ? (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        ) : null}
 
         <TouchableOpacity
           style={styles.loginLink}
@@ -256,6 +265,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  button: {
+    backgroundColor: "#ff3f6c",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  errorText: {
+    color: "#ff3f6c",
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 14,
   },
   loginLink: {
     marginTop: 20,

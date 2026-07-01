@@ -1,11 +1,43 @@
 const express = require("express");
 const Product = require("../models/Product");
+const Category = require("../models/Category");
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
     const categories = await Product.find();
     res.status(200).json(categories);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+});
+
+router.post("/", async (req, res) => {
+  try {
+    const { name, brand, price, discount, description, sizes, images, categoryId } = req.body;
+    if (!name || !brand || !price || !images?.length) {
+      return res.status(400).json({ message: "Name, brand, price and images are required" });
+    }
+
+    const product = new Product({
+      name,
+      brand,
+      price,
+      discount: discount || "",
+      description: description || "",
+      sizes: Array.isArray(sizes) ? sizes : sizes ? sizes.split(",").map((s) => s.trim()) : [],
+      images: Array.isArray(images) ? images : [images],
+    });
+
+    const savedProduct = await product.save();
+    if (categoryId) {
+      await Category.findByIdAndUpdate(categoryId, {
+        $push: { productId: savedProduct._id },
+      });
+    }
+
+    res.status(201).json(savedProduct);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });

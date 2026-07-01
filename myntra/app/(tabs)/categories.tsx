@@ -19,7 +19,7 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Search, X } from "lucide-react-native";
-import axios from "axios";
+import { api } from "@/utils/api";
 
 // const categories = [
 //   {
@@ -127,11 +127,24 @@ export default function TabTwoScreen() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setcategories] = useState<any>(null);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryImage, setNewCategoryImage] = useState("");
+  const [newCategorySubcategories, setNewCategorySubcategories] = useState("");
+  const [categoryMessage, setCategoryMessage] = useState("");
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductBrand, setNewProductBrand] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductDiscount, setNewProductDiscount] = useState("");
+  const [newProductDescription, setNewProductDescription] = useState("");
+  const [newProductSizes, setNewProductSizes] = useState("");
+  const [newProductImages, setNewProductImages] = useState("");
+  const [productMessage, setProductMessage] = useState("");
   useEffect(() => {
     const fetchproduct = async () => {
       try {
         setIsLoading(true);
-        const cat = await axios.get("https://myntra-clone-xj36.onrender.com/category");
+        const cat = await api.get("/category");
         setcategories(cat.data);
       } catch (error) {
         console.log(error);
@@ -142,6 +155,75 @@ export default function TabTwoScreen() {
     };
     fetchproduct();
   }, []);
+
+  const refreshCategories = async () => {
+    try {
+      setIsLoading(true);
+      const cat = await api.get("/category");
+      setcategories(cat.data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim() || !newCategoryImage.trim()) {
+      setCategoryMessage("Name and image are required.");
+      return;
+    }
+    try {
+      setCategoryMessage("");
+      await api.post("/category", {
+        name: newCategoryName,
+        image: newCategoryImage,
+        subcategory: newCategorySubcategories,
+      });
+      setNewCategoryName("");
+      setNewCategoryImage("");
+      setNewCategorySubcategories("");
+      setCategoryMessage("Category created successfully.");
+      refreshCategories();
+      setCreatingCategory(false);
+    } catch (error) {
+      console.log(error);
+      setCategoryMessage("Unable to create category.");
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    if (!selectedCategory || !newProductName.trim() || !newProductBrand.trim() || !newProductPrice.trim() || !newProductImages.trim()) {
+      setProductMessage("Product name, brand, price and image are required.");
+      return;
+    }
+    try {
+      setProductMessage("");
+      await api.post("/product", {
+        name: newProductName,
+        brand: newProductBrand,
+        price: Number(newProductPrice),
+        discount: newProductDiscount,
+        description: newProductDescription,
+        sizes: newProductSizes,
+        images: newProductImages.split(",").map((item) => item.trim()),
+        categoryId: selectedCategory,
+      });
+      setNewProductName("");
+      setNewProductBrand("");
+      setNewProductPrice("");
+      setNewProductDiscount("");
+      setNewProductDescription("");
+      setNewProductSizes("");
+      setNewProductImages("");
+      setProductMessage("Product created successfully.");
+      refreshCategories();
+    } catch (error) {
+      console.log(error);
+      setProductMessage("Unable to create product.");
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
@@ -214,6 +296,43 @@ export default function TabTwoScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Categories</Text>
       </View>
+
+      <View style={styles.createHeader}>
+        <TouchableOpacity
+          style={styles.createToggle}
+          onPress={() => setCreatingCategory(!creatingCategory)}
+        >
+          <Text style={styles.createToggleText}>
+            {creatingCategory ? "Hide" : "Add New Category"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {creatingCategory ? (
+        <View style={styles.createForm}>
+          <TextInput
+            style={styles.input}
+            placeholder="Category Name"
+            value={newCategoryName}
+            onChangeText={setNewCategoryName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Image URL"
+            value={newCategoryImage}
+            onChangeText={setNewCategoryImage}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Subcategories (comma separated)"
+            value={newCategorySubcategories}
+            onChangeText={setNewCategorySubcategories}
+          />
+          <TouchableOpacity style={styles.primaryButton} onPress={handleCreateCategory}>
+            <Text style={styles.primaryButtonText}>CREATE CATEGORY</Text>
+          </TouchableOpacity>
+          {categoryMessage ? <Text style={styles.formMessage}>{categoryMessage}</Text> : null}
+        </View>
+      ) : null}
 
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
@@ -310,6 +429,57 @@ export default function TabTwoScreen() {
             <View style={styles.productsGrid}>
               {renderProducts(selectedcategorydata?.productId)}
             </View>
+
+            <View style={styles.createForm}>
+              <Text style={styles.sectionTitle}>Add Product to {selectedcategorydata.name}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Product Name"
+                value={newProductName}
+                onChangeText={setNewProductName}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Brand"
+                value={newProductBrand}
+                onChangeText={setNewProductBrand}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Price"
+                keyboardType="numeric"
+                value={newProductPrice}
+                onChangeText={setNewProductPrice}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Discount (e.g. 50% OFF)"
+                value={newProductDiscount}
+                onChangeText={setNewProductDiscount}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Description"
+                value={newProductDescription}
+                onChangeText={setNewProductDescription}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Sizes (comma separated)"
+                value={newProductSizes}
+                onChangeText={setNewProductSizes}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Image URLs (comma separated)"
+                value={newProductImages}
+                onChangeText={setNewProductImages}
+              />
+              <TouchableOpacity style={styles.primaryButton} onPress={handleCreateProduct}>
+                <Text style={styles.primaryButtonText}>CREATE PRODUCT</Text>
+              </TouchableOpacity>
+              {productMessage ? <Text style={styles.formMessage}>{productMessage}</Text> : null}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -393,6 +563,52 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#3e3e3e",
     marginBottom: 10,
+  },
+  createHeader: {
+    padding: 15,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  createToggle: {
+    backgroundColor: "#ff3f6c",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  createToggleText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  createForm: {
+    padding: 15,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  input: {
+    backgroundColor: "#f5f5f5",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  primaryButton: {
+    backgroundColor: "#3e3e3e",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  formMessage: {
+    marginTop: 10,
+    color: "#3e3e3e",
+    fontSize: 14,
   },
   subcategories: {
     flexDirection: "row",

@@ -22,7 +22,7 @@ import React from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 
-const orders = [
+const sampleOrders = [
   {
     id: "ORD123456",
     date: "15 Mar 2024",
@@ -135,41 +135,65 @@ export default function Orders() {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-  const [orders, setorder] = useState<any>(null);
+  const [orders, setOrders] = useState<any>(null);
   useEffect(() => {
-    // Simulate loading time
     const fetchorder = async () => {
-      if (user) {
-        try {
-          setIsLoading(true);
-          const product = await axios.get(
-            `https://myntra-clone-xj36.onrender.com/order/user/${user._id}`
-          );
-          setorder(product.data);
-        } catch (error) {
-          console.log(error);
-          setIsLoading(false);
-        } finally {
-          setIsLoading(false);
-        }
+      if (!user) {
+        setOrders([]);
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const response = await api.get(`/order/user/${user._id}`);
+        setOrders(response.data);
+      } catch (error) {
+        console.log(error);
+        setOrders([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchorder();
-  }, []);
-   if (isLoading) {
-      return (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#ff3f6c" />
-        </View>
-      );
-    }
+  }, [user]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#ff3f6c" />
+      </View>
+    );
+  }
   const toggleOrderDetails = (orderId: string) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
-  if (!orders) {
+  if (!user) {
     return (
       <View style={styles.container}>
-        <Text>Order not found</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Orders</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Package size={64} color="#ff3f6c" />
+          <Text style={styles.emptyTitle}>
+            Please login to view your order history
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  if (!orders || orders.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Orders</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No orders found yet.</Text>
+          <Text style={styles.emptySubtitle}>
+            Add some items to your bag and place your first order.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -200,7 +224,7 @@ export default function Orders() {
               {order.items.map((item:any) => (
                 <View key={item._id} style={styles.orderItem}>
                   <Image
-                    source={{ uri: item.productId.images }}
+                    source={{ uri: item.productId.images?.[0] }}
                     style={styles.itemImage}
                   />
                   <View style={styles.itemInfo}>

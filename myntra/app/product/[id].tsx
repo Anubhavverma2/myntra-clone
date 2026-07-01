@@ -98,9 +98,7 @@ export default function ProductDetails() {
     const fetchproduct = async () => {
       try {
         setIsLoading(true);
-        const product = await axios.get(
-          `https://myntra-clone-xj36.onrender.com/product/${id}`
-        );
+        const product = await api.get(`/product/${id}`);
         setproduct(product.data);
       } catch (error) {
         console.log(error);
@@ -150,7 +148,7 @@ export default function ProductDetails() {
     }
 
     try {
-      await axios.post(`https://myntra-clone-xj36.onrender.com/wishlist`, {
+      await api.post(`/wishlist`, {
         userId: user._id,
         productId: id,
       });
@@ -173,7 +171,7 @@ export default function ProductDetails() {
     }
     try {
       setLoading(true);
-      await axios.post(`https://myntra-clone-xj36.onrender.com/bag`, {
+      await api.post(`/bag`, {
         userId: user._id,
         productId: id,
         size: selectedSize,

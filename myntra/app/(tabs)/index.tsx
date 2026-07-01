@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { Search, ChevronRight } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
+import { api } from "@/utils/api";
 
 // const categories = [
 //   {
@@ -94,11 +94,75 @@ const deals = [
   },
 ];
 
+const fallbackCategories = [
+  {
+    _id: "cat1",
+    name: "Men",
+    image:
+      "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop",
+  },
+  {
+    _id: "cat2",
+    name: "Women",
+    image:
+      "https://images.unsplash.com/photo-1618244972963-dbad0c4abf18?w=500&auto=format&fit=crop",
+  },
+  {
+    _id: "cat3",
+    name: "Kids",
+    image:
+      "https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=500&auto=format&fit=crop",
+  },
+];
+
+const fallbackProducts = [
+  {
+    _id: "prod1",
+    name: "Premium Cotton T-Shirt",
+    brand: "Roadster",
+    price: 799,
+    discount: "60% OFF",
+    images: [
+      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&auto=format&fit=crop",
+    ],
+  },
+  {
+    _id: "prod2",
+    name: "Denim Jacket",
+    brand: "Levis",
+    price: 2499,
+    discount: "40% OFF",
+    images: [
+      "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=500&auto=format&fit=crop",
+    ],
+  },
+  {
+    _id: "prod3",
+    name: "Summer Dress",
+    brand: "ONLY",
+    price: 1299,
+    discount: "50% OFF",
+    images: [
+      "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=500&auto=format&fit=crop",
+    ],
+  },
+  {
+    _id: "prod4",
+    name: "Classic Sneakers",
+    brand: "Nike",
+    price: 3499,
+    discount: "30% OFF",
+    images: [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop",
+    ],
+  },
+];
+
 export default function Home() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [product, setproduct] = useState<any>(null);
-  const [categories, setcategories] = useState<any>(null);
+  const [product, setproduct] = useState<any>([]);
+  const [categories, setcategories] = useState<any>([]);
   const { user } = useAuth();
   const handleProductPress = (productId: number) => {
     if (!user) {
@@ -111,8 +175,8 @@ export default function Home() {
     const fetchproduct = async () => {
       try {
         setIsLoading(true);
-        const cat = await axios.get("https://myntra-clone-xj36.onrender.com/category");
-        const product = await axios.get("https://myntra-clone-xj36.onrender.com/product");
+        const cat = await api.get("/category");
+        const product = await api.get("/product");
         setcategories(cat.data);
         setproduct(product.data);
       } catch (error) {
@@ -124,10 +188,20 @@ export default function Home() {
     };
     fetchproduct();
   }, []);
+  const categoriesToShow = categories && categories.length > 0 ? categories : fallbackCategories;
+  const productsToShow = product && product.length > 0 ? product : fallbackProducts;
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logo}>MYNTRA</Text>
+        <View>
+          <Text style={styles.logo}>MYNTRA</Text>
+          {user ? (
+            <Text style={styles.greeting}>Hi, {user.name}! Welcome to your dashboard.</Text>
+          ) : (
+            <Text style={styles.greeting}>Login to see exclusive deals and your bag.</Text>
+          )}
+        </View>
         <TouchableOpacity style={styles.searchButton}>
           <Search size={24} color="#3e3e3e" />
         </TouchableOpacity>
@@ -154,24 +228,26 @@ export default function Home() {
           style={styles.categoriesScroll}
         >
           {isLoading ? (
-            <ActivityIndicator
-              size="large"
-              color="#ff3f6c"
-              style={styles.loader}
-            />
-          ) : !categories || categories.length === 0 ? (
-            <Text style={styles.emptyText}>No categories available</Text>
-          ) : (
-            categories.map((category: any) => (
-              <TouchableOpacity key={category._id} style={styles.categoryCard}>
-                <Image
-                  source={{ uri: category.image }}
-                  style={styles.categoryImage}
-                />
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </TouchableOpacity>
-            ))
-          )}
+  <ActivityIndicator
+    size="large"
+    color="#ff3f6c"
+    style={styles.loader}
+  />
+) : (
+  categoriesToShow.map((category: any) => (
+    <TouchableOpacity
+      key={category._id}
+      style={styles.categoryCard}
+      onPress={() => router.push("/categories")}
+    >
+      <Image
+        source={{ uri: category.image }}
+        style={styles.categoryImage}
+      />
+      <Text style={styles.categoryName}>{category.name}</Text>
+    </TouchableOpacity>
+  ))
+)}
         </ScrollView>
       </View>
 
@@ -206,20 +282,16 @@ export default function Home() {
               color="#ff3f6c"
               style={styles.loader}
             />
-          ) : !product || product.length === 0 ? (
-            <Text style={styles.emptyText}>No Product available</Text>
-          ) : ( 
+          ) : (
             <View style={styles.productsGrid}>
-              {product.map((product: any) => (
+              {productsToShow.map((product: any) => (
                 <TouchableOpacity
                   key={product._id}
                   style={styles.productCard}
                   onPress={() => handleProductPress(product._id)}
                 >
                   <Image
-                    source={{ uri: product.images[0
-                      
-                    ] }}
+                    source={{ uri: product.images[0] }}
                     style={styles.productImage}
                   />
                   <View style={styles.productInfo}>

@@ -55,22 +55,22 @@ router.post("/create/:userId", async (req, res) => {
       quantity: item.quantity,
     }));
     const total = orderitem.reduce(
-      (sum, item) => sum + item.price + item.quantity,
+      (sum, item) => sum + item.price * item.quantity,
       0
     );
     const newOrder = new Order({
       userId: userid,
       date: new Date().toISOString(),
       status: "Processing",
-      item: orderitem,
+      items: orderitem,
       total: total,
-      shippingAddress: req.body.shippingAddress,
-      paymentMethod:req.body.paymentMethod,
+      shippingAddress: req.body.shippingAddress || "",
+      paymentMethod: req.body.paymentMethod || "",
       tracking: genrateRandomTracking(),
     });
-    await newOrder.save();
+    const savedOrder = await newOrder.save();
     await Bag.deleteMany({ userId: userid });
-    res.status(200).json({ message: "Order placed successfully" });
+    res.status(201).json(savedOrder);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });
