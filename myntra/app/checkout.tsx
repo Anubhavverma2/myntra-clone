@@ -1,9 +1,10 @@
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
+import { useAppTheme } from "@/context/ThemeContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { api } from "@/utils/api";
 import { useRouter } from "expo-router";
 import { CreditCard, MapPin, Truck } from "lucide-react-native";
-import React from "react";
-import { useState } from "react";
 import {
   View,
   Text,
@@ -11,255 +12,137 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 
 export default function Checkout() {
   const [loading, setLoading] = useState(false);
+  const [bagTotal, setBagTotal] = useState(0);
+  const [address, setAddress] = useState("123 Main Street, Mumbai, Maharashtra 400001");
   const router = useRouter();
   const { user } = useAuth();
-  const handleplaceorder = async() => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    try {
-      await api.post(`/order/create/${user._id}`, {
-        shippingAddress: "123 Main Street, Apt 4B, New York, NY, 10001",
-        paymentMethod: "Card",
-      });
-      router.push("/orders");
-    } catch (error) {
-      console.log(error);
-    }
+  const { colors } = useAppTheme();
+  const { requireAuth } = useRequireAuth();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
-    
+  useEffect(() => {
+    if (!user) return;
+    api.get(`/bag/${user._id}`).then((res) => setBagTotal(res.data.total || 0)).catch(console.log);
+  }, [user]);
+
+  const shipping = bagTotal > 0 ? 99 : 0;
+  const tax = Math.round(bagTotal * 0.05);
+  const grandTotal = bagTotal + shipping + tax;
+
+  const handlePlaceOrder = () => {
+    requireAuth("place an order", async () => {
+      try {
+        setLoading(true);
+        const validation = await api.post(`/bag/validate-checkout/${user!._id}`);
+        if (!validation.data.valid) {
+          Alert.alert("Checkout Issue", validation.data.issues.map((i: any) => i.message).join("\n"));
+          return;
+        }
+        await api.post(`/order/create/${user!._id}`, {
+          shippingAddress: address,
+          paymentMethod: "UPI",
+        });
+        Alert.alert("Success", "Order placed successfully!");
+        router.push("/orders");
+      } catch (error: any) {
+        Alert.alert("Error", error.response?.data?.message || "Order failed");
+      } finally {
+        setLoading(false);
+      }
+    });
   };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Checkout</Text>
-      </View>
+      <View style={styles.header}><Text style={styles.headerTitle}>Checkout</Text></View>
       <ScrollView style={styles.content}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <MapPin size={24} color="#ff3f6c" />
+            <MapPin size={24} color={colors.primary} />
             <Text style={styles.sectionTitle}>Shipping Address</Text>
           </View>
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              defaultValue="John Doe"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Address Line 1"
-              defaultValue="123 Main Street"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Address Line 2"
-              defaultValue="Apt 4B"
-            />
-            <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="City"
-                defaultValue="New York"
-              />
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="State"
-                defaultValue="NY"
-              />
-            </View>
-            <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="Postal Code"
-                defaultValue="10001"
-              />
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="Country"
-                defaultValue="United States"
-              />
-            </View>
-          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter delivery address"
+            placeholderTextColor={colors.textMuted}
+            value={address}
+            onChangeText={setAddress}
+            multiline
+          />
         </View>
-        {/* Payment Section */}
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CreditCard size={24} color="#ff3f6c" />
+            <CreditCard size={24} color={colors.primary} />
             <Text style={styles.sectionTitle}>Payment Method</Text>
           </View>
-          <View style={styles.form}>
-            <TextInput
-              style={styles.input}
-              placeholder="Card Number"
-              defaultValue="**** **** **** 4242"
-            />
-            <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="Expiry Date"
-                defaultValue="12/25"
-              />
-              <TextInput
-                style={[styles.input, styles.halfInput]}
-                placeholder="CVV"
-                defaultValue="***"
-              />
-            </View>
-          </View>
+          <Text style={styles.paymentNote}>UPI / Card / Net Banking (Demo Mode)</Text>
         </View>
-        {/* Order Summary */}
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Truck size={24} color="#ff3f6c" />
+            <Truck size={24} color={colors.primary} />
             <Text style={styles.sectionTitle}>Order Summary</Text>
           </View>
           <View style={styles.summary}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>₹3,798</Text>
+              <Text style={styles.summaryValue}>₹{bagTotal}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Shipping</Text>
-              <Text style={styles.summaryValue}>₹99</Text>
+              <Text style={styles.summaryValue}>₹{shipping}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tax</Text>
-              <Text style={styles.summaryValue}>₹190</Text>
+              <Text style={styles.summaryValue}>₹{tax}</Text>
             </View>
             <View style={[styles.summaryRow, styles.total]}>
               <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>₹4,087</Text>
+              <Text style={styles.totalValue}>₹{grandTotal}</Text>
             </View>
           </View>
         </View>
       </ScrollView>
+
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.placeOrderButton}
-          onPress={handleplaceorder}
-        >
-          <Text style={styles.placeOrderButtonText}>PLACE ORDER</Text>
+        <TouchableOpacity style={styles.placeOrderButton} onPress={handlePlaceOrder} disabled={loading}>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.placeOrderButtonText}>PLACE ORDER</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  header: {
-    padding: 15,
-    paddingTop: 50,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#3e3e3e",
-  },
-  content: {
-    flex: 1,
-    padding: 15,
-  },
-  section: {
-    marginBottom: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#3e3e3e",
-    marginLeft: 10,
-  },
-  form: {
-    gap: 10,
-  },
-  input: {
-    backgroundColor: "#f5f5f5",
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  halfInput: {
-    width: "48%",
-  },
-  summary: {
-    gap: 10,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 5,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: "#666",
-  },
-  summaryValue: {
-    fontSize: 16,
-    color: "#3e3e3e",
-  },
-  total: {
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-    marginTop: 10,
-    paddingTop: 10,
-  },
-  totalLabel: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#3e3e3e",
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#ff3f6c",
-  },
-  footer: {
-    padding: 15,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-  placeOrderButton: {
-    backgroundColor: "#ff3f6c",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  placeOrderButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-});
+
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { padding: 15, paddingTop: 50, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    headerTitle: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    content: { flex: 1, padding: 15 },
+    section: { marginBottom: 16, backgroundColor: colors.card, borderRadius: 4, padding: 15, borderWidth: 1, borderColor: colors.border },
+    sectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+    sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginLeft: 10 },
+    input: { backgroundColor: colors.inputBg, padding: 14, borderRadius: 4, fontSize: 15, color: colors.text, minHeight: 80, textAlignVertical: "top" },
+    paymentNote: { color: colors.textSecondary, fontSize: 14 },
+    summary: { gap: 8 },
+    summaryRow: { flexDirection: "row", justifyContent: "space-between" },
+    summaryLabel: { fontSize: 15, color: colors.textSecondary },
+    summaryValue: { fontSize: 15, color: colors.text },
+    total: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, paddingTop: 10 },
+    totalLabel: { fontSize: 17, fontWeight: "bold", color: colors.text },
+    totalValue: { fontSize: 17, fontWeight: "bold", color: colors.primary },
+    footer: { padding: 15, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+    placeOrderButton: { backgroundColor: colors.primary, padding: 15, borderRadius: 4, alignItems: "center" },
+    placeOrderButtonText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+  });

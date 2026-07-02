@@ -1,90 +1,141 @@
 const express = require("express");
 const Bag = require("../models/Bag");
 const Order = require("../models/Order");
+const Transaction = require("../models/Transaction");
+const TransactionAudit = require("../models/TransactionAudit");
+const Product = require("../models/Product");
 const router = express.Router();
 const mongoose = require("mongoose");
+const crypto = require("crypto");
+const { enqueueNotification } = require("../services/notificationQueue");
 
 function genrateRandomTracking() {
   const carriers = ["Delhivery", "Bluedart", "Ecom Express", "XpressBees"];
-  const statusOptions = [
-    "Shipped",
-    "Out for Delivery",
-    "Delivered",
-    "In Transit",
-  ];
+  const statusOptions = ["Shipped", "Out for Delivery", "Delivered", "In Transit"];
   const locations = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune"];
   const randomcarrier = carriers[Math.floor(Math.random() * carriers.length)];
-  const randomstatusOptions =
-    statusOptions[Math.floor(Math.random() * statusOptions.length)];
-  const randomlocations =
-    locations[Math.floor(Math.random() * locations.length)];
+  const randomstatusOptions = statusOptions[Math.floor(Math.random() * statusOptions.length)];
+  const randomlocations = locations[Math.floor(Math.random() * locations.length)];
 
   return {
     number: "TRK" + Math.floor(Math.random() * 10000000),
     carrier: randomcarrier,
-    estimatedDelivery: new Date(
-      Date.now() + 5 * 24 * 60 * 60 * 1000
-    ).toISOString(),
+    estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     currentLocation: randomlocations,
     status: randomstatusOptions,
     timeline: [
-      {
-        status: "Order placed",
-        location: "Warehouse",
-        timestamp: new Date().toISOString(),
-      },
-      {
-        status: randomstatusOptions,
-        location: randomlocations,
-        timestamp: new Date().toISOString(),
-      },
+      { status: "Order placed", location: "Warehouse", timestamp: new Date().toISOString() },
+      { status: randomstatusOptions, location: randomlocations, timestamp: new Date().toISOString() },
     ],
   };
 }
+
 router.post("/create/:userId", async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const userid = req.params.userId;
-    const bag = await Bag.find({ userId: userid }).populate("productId");
+    const bag = await Bag.find({ userId: userid, section: "active" })
+      .populate("productId")
+      .session(session);
+
     if (bag.length === 0) {
-      return res.status(400).json({ message: "No item in the bag" });
+      await session.abortTransaction();
+      return res.status(400).json({ message: "No active items in the bag" });
     }
+
+    const issues = [];
+    for (const item of bag) {
+      if (!item.productId?.isActive) issues.push(`${item.productId?.name || "Item"} discontinued`);
+      else if (item.productId.stock < item.quantity) issues.push(`${item.productId.name} out of stock`);
+    }
+    if (issues.length > 0) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Checkout validation failed", issues });
+    }
+
     const orderitem = bag.map((item) => ({
       productId: item.productId._id,
       size: item.size,
       price: item.productId.price,
       quantity: item.quantity,
     }));
-    const total = orderitem.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+
+    const total = orderitem.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const paymentMethod = req.body.paymentMethod || "Card";
+
     const newOrder = new Order({
       userId: userid,
       date: new Date().toISOString(),
       status: "Processing",
       items: orderitem,
-      total: total,
+      total,
       shippingAddress: req.body.shippingAddress || "",
-      paymentMethod: req.body.paymentMethod || "",
+      paymentMethod,
       tracking: genrateRandomTracking(),
     });
-    const savedOrder = await newOrder.save();
-    await Bag.deleteMany({ userId: userid });
-    res.status(201).json(savedOrder);
+    const savedOrder = await newOrder.save({ session });
+
+    const invoiceId = `INV-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    const transaction = await Transaction.create(
+      [
+        {
+          userId: userid,
+          orderId: savedOrder._id,
+          invoiceId,
+          paymentMode: paymentMethod,
+          amount: total,
+          status: "success",
+        },
+      ],
+      { session }
+    );
+
+    await TransactionAudit.create(
+      [{ transactionId: transaction[0]._id, event: "created", details: { orderId: savedOrder._id } }],
+      { session }
+    );
+    await TransactionAudit.create(
+      [{ transactionId: transaction[0]._id, event: "success", details: { amount: total } }],
+      { session }
+    );
+
+    for (const item of bag) {
+      await Product.findByIdAndUpdate(
+        item.productId._id,
+        { $inc: { stock: -item.quantity, purchaseCount: item.quantity } },
+        { session }
+      );
+    }
+
+    await Bag.deleteMany({ userId: userid, section: "active" }, { session });
+    await session.commitTransaction();
+
+    await enqueueNotification({
+      userId: userid,
+      title: "Order Placed Successfully!",
+      body: `Your order of ₹${total} has been confirmed.`,
+      data: { screen: "orders", orderId: savedOrder._id.toString() },
+    });
+
+    res.status(201).json({ order: savedOrder, transaction: transaction[0] });
   } catch (error) {
+    await session.abortTransaction();
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 });
+
 router.get("/user/:userid", async (req, res) => {
   try {
-    const order = await Order.find({ userId: req.params.userid }).populate(
-      "items.productId"
-    );
+    const order = await Order.find({ userId: req.params.userid }).populate("items.productId");
     res.status(200).json(order);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });
   }
 });
+
 module.exports = router;

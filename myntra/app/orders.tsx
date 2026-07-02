@@ -19,8 +19,9 @@ import {
   CreditCard,
 } from "lucide-react-native";
 import React from "react";
-import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import { useAppTheme } from "@/context/ThemeContext";
+import { api } from "@/utils/api";
 
 const sampleOrders = [
   {

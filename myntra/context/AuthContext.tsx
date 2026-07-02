@@ -1,9 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { getUserData, saveUserData, clearUserData } from "@/utils/storage";
+import { mergeRecentlyViewedOnLogin } from "@/utils/recentlyViewed";
+import { registerForPushNotifications } from "@/utils/notifications";
 import React from "react";
 import { api } from "@/utils/api";
+
 type AuthContextType = {
   isAuthenticated: boolean;
+  authReady: boolean;
   user: { _id: string; name: string; email: string } | null;
   Signup: (fullName: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -12,8 +16,14 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function postAuthSetup(userId: string) {
+  await mergeRecentlyViewedOnLogin(userId);
+  await registerForPushNotifications(userId);
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<{
     _id: string;
     name: string;
@@ -26,41 +36,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (data._id && data.name && data.email) {
         setUser({ _id: data._id, name: data.name, email: data.email });
         setIsAuthenticated(true);
+        await postAuthSetup(data._id);
       }
+      setAuthReady(true);
     })();
   }, []);
 
   const login = async (identifier: string, password: string) => {
-    const res = await api.post("/user/login", {
-      identifier,
-      password,
-    });
+    const res = await api.post("/user/login", { identifier, password });
+    const data = await res.data.user;
+    if (data.fullName) {
+      await saveUserData(data._id, data.fullName, data.email);
+      setUser({ _id: data._id, name: data.fullName, email: data.email });
+      setIsAuthenticated(true);
+      await postAuthSetup(data._id);
+    } else {
+      throw new Error(data.message || "Login failed");
+    }
+  };
 
-    const data = await res.data.user;
-    if (data.fullName) {
-      await saveUserData(data._id, data.fullName, data.email);
-      setUser({ _id: data._id, name: data.fullName, email: data.email });
-      setIsAuthenticated(true);
-    } else {
-      throw new Error(data.message || "Login failed");
-    }
-  };
   const Signup = async (fullName: string, email: string, password: string) => {
-    // 👉 Replace with your real API URL
-    const res = await api.post("/user/signup", {
-      fullName,
-      email,
-      password,
-    });
+    const res = await api.post("/user/signup", { fullName, email, password });
     const data = await res.data.user;
     if (data.fullName) {
       await saveUserData(data._id, data.fullName, data.email);
       setUser({ _id: data._id, name: data.fullName, email: data.email });
       setIsAuthenticated(true);
+      await postAuthSetup(data._id);
     } else {
-      throw new Error(data.message || "Login failed");
+      throw new Error(data.message || "Signup failed");
     }
   };
+
   const logout = async () => {
     await clearUserData();
     setUser(null);
@@ -68,9 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={{ isAuthenticated, user, Signup, login, logout }}
-    >
+    <AuthContext.Provider value={{ isAuthenticated, authReady, user, Signup, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

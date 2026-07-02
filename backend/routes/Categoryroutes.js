@@ -4,8 +4,21 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const categories = await Category.find().populate("productId");
+    const categories = await Category.find().select("name image subcategory productId").lean();
     res.status(200).json(categories);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id).populate("productId");
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+    res.status(200).json(category);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });

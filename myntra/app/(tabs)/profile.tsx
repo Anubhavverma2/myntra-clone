@@ -11,25 +11,26 @@ import {
   Package,
   Heart,
   CreditCard,
-  MapPin,
   Settings,
   LogOut,
   ChevronRight,
 } from "lucide-react-native";
-import React from "react";
+import React, { useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAppTheme } from "@/context/ThemeContext";
 
 const menuItems = [
   { icon: Package, label: "Orders", route: "/orders" },
   { icon: Heart, label: "Wishlist", route: "/wishlist" },
-  { icon: CreditCard, label: "Payment Methods", route: "/payments" },
-  { icon: MapPin, label: "Addresses", route: "/addresses" },
-  { icon: Settings, label: "Settings", route: "/settings" },
+  { icon: CreditCard, label: "My Transactions", route: "/transactions" },
+  { icon: Settings, label: "Settings & Theme", route: "/settings" },
 ];
 
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const handleLogout = () => {
     logout()
     router.replace("/");
@@ -42,7 +43,7 @@ export default function Profile() {
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
         <View style={styles.emptyState}>
-          <User size={64} color="#ff3f6c" />
+          <User size={64} color={colors.primary} />
           <Text style={styles.emptyTitle}>
             Please login to view your profile
           </Text>
@@ -82,16 +83,16 @@ export default function Profile() {
               onPress={() => router.push(item.route as any)}
             >
               <View style={styles.menuItemLeft}>
-                <item.icon size={24} color="#3e3e3e" />
+                <item.icon size={24} color={colors.text} />
                 <Text style={styles.menuItemLabel}>{item.label}</Text>
               </View>
-              <ChevronRight size={24} color="#3e3e3e" />
+              <ChevronRight size={24} color={colors.text} />
             </TouchableOpacity>
           ))}
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <LogOut size={24} color="#ff3f6c" />
+          <LogOut size={24} color={colors.primary} />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -99,113 +100,62 @@ export default function Profile() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  header: {
-    padding: 15,
-    paddingTop: 50,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#3e3e3e",
-  },
-  content: {
-    flex: 1,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    color: "#3e3e3e",
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  loginButton: {
-    backgroundColor: "#ff3f6c",
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 10,
-  },
-  loginButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#fff",
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#ff3f6c",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userDetails: {
-    marginLeft: 15,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#3e3e3e",
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: "#666",
-  },
-  menuSection: {
-    marginTop: 20,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  menuItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  menuItemLabel: {
-    fontSize: 16,
-    color: "#3e3e3e",
-    marginLeft: 15,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 15,
-    marginTop: 20,
-    marginHorizontal: 15,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ff3f6c",
-  },
-  logoutText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: "#ff3f6c",
-    fontWeight: "bold",
-  },
-});
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      padding: 15,
+      paddingTop: 50,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    content: { flex: 1 },
+    emptyState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+    emptyTitle: { fontSize: 18, color: colors.text, marginTop: 20, marginBottom: 20 },
+    loginButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 40,
+      paddingVertical: 15,
+      borderRadius: 4,
+    },
+    loginButtonText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+    userInfo: { flexDirection: "row", alignItems: "center", padding: 20, backgroundColor: colors.surface },
+    avatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    userDetails: { marginLeft: 15 },
+    userName: { fontSize: 20, fontWeight: "bold", color: colors.text, marginBottom: 5 },
+    userEmail: { fontSize: 14, color: colors.textSecondary },
+    menuSection: { marginTop: 12 },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 15,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuItemLeft: { flexDirection: "row", alignItems: "center" },
+    menuItemLabel: { fontSize: 16, color: colors.text, marginLeft: 15 },
+    logoutButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 15,
+      marginTop: 20,
+      marginHorizontal: 15,
+      borderRadius: 4,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    logoutText: { marginLeft: 10, fontSize: 16, color: colors.primary, fontWeight: "bold" },
+  });
