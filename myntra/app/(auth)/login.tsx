@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -43,7 +44,12 @@ export default function Login() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <Image
         source={{
           uri: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=2070&auto=format&fit=crop",
@@ -106,7 +112,7 @@ export default function Login() {
           <Text style={styles.signupText}>Don't have an account? Sign Up</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -115,6 +121,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 32,
+  },
   backgroundImage: {
     width: "100%",
     height: "50%",
@@ -122,11 +132,11 @@ const styles = StyleSheet.create({
     top: 0,
   },
   formContainer: {
-    flex: 1,
     justifyContent: "flex-start",
     padding: 25,
     backgroundColor: "rgba(255, 255, 255, 0.97)",
     marginTop: "55%",
+    minHeight: 520,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     shadowColor: "#000",

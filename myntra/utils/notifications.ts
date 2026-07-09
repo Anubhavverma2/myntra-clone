@@ -57,6 +57,10 @@ export function setupNotificationListeners(
   onNotificationReceived?: (notification: Notifications.Notification) => void,
   onNotificationResponse?: (response: Notifications.NotificationResponse) => void
 ) {
+  if (Platform.OS === "web") {
+    return () => {};
+  }
+
   const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
     onNotificationReceived?.(notification);
   });
@@ -65,9 +69,13 @@ export function setupNotificationListeners(
     onNotificationResponse?.(response);
   });
 
-  Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (response) onNotificationResponse?.(response);
-  });
+  if (typeof Notifications.getLastNotificationResponseAsync === "function") {
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) onNotificationResponse?.(response);
+      })
+      .catch((error) => console.log("Last notification response unavailable:", error));
+  }
 
   return () => {
     receivedSub.remove();

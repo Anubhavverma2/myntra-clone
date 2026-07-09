@@ -41,12 +41,11 @@ export default function ProductCard({
   const router = useRouter();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addToBag } = useBag();
-  const { requireAuth, isLoggedIn } = useRequireAuth();
+  const { isLoggedIn } = useRequireAuth();
   const [wishlistLoading, setWishlistLoading] = React.useState(false);
   const [bagLoading, setBagLoading] = React.useState(false);
 
   const inWishlist = isInWishlist(product._id);
-  const isServerProduct = /^[a-f\d]{24}$/i.test(product._id);
   const styles = createStyles(colors, width);
 
   const handleWishlist = async (e?: any) => {
@@ -57,8 +56,8 @@ export default function ProductCard({
       setWishlistLoading(false);
     };
 
-    if (isServerProduct && !isLoggedIn) {
-      requireAuth("save items to wishlist", save);
+    if (!isLoggedIn) {
+      router.push("/login");
       return;
     }
 
@@ -75,8 +74,8 @@ export default function ProductCard({
       else Alert.alert("Error", "Could not add to bag.");
     };
 
-    if (isServerProduct && !isLoggedIn) {
-      requireAuth("add items to bag", add);
+    if (!isLoggedIn) {
+      router.push("/login");
       return;
     }
 

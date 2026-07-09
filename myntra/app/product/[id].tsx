@@ -16,7 +16,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useBag } from "@/context/BagContext";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
 import { trackProductView } from "@/utils/recentlyViewed";
 import ProductCard from "@/components/ProductCard";
@@ -29,7 +28,6 @@ export default function ProductDetails() {
   const { colors } = useAppTheme();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addToBag } = useBag();
-  const { requireAuth } = useRequireAuth();
 
   const [selectedSize, setSelectedSize] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -74,19 +72,24 @@ export default function ProductDetails() {
   }, [id, user?._id]);
 
   const handleWishlist = () => {
-    requireAuth("save to wishlist", async () => {
-      await toggleWishlist(id!);
-    });
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    toggleWishlist(id!);
   };
 
   const handleAddToBag = () => {
-    requireAuth("add to bag", async () => {
-      if (!selectedSize) {
-        Alert.alert("Select Size", "Please select a size before adding to bag.");
-        return;
-      }
-      setLoading(true);
-      const ok = await addToBag(id!, selectedSize, 1);
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    if (!selectedSize) {
+      Alert.alert("Select Size", "Please select a size before adding to bag.");
+      return;
+    }
+    setLoading(true);
+    addToBag(id!, selectedSize, 1).then((ok) => {
       setLoading(false);
       if (ok) {
         Alert.alert("Added to Bag", "Item added successfully.", [
