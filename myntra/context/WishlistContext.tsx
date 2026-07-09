@@ -1,12 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "@/utils/api";
 import { useAuth } from "@/context/AuthContext";
+import {
+  getLocalWishlist,
+  LocalProductSnapshot,
+  toggleLocalWishlist,
+} from "@/utils/storage";
 
 type WishlistContextType = {
   wishlistIds: Set<string>;
   wishlistCount: number;
   isInWishlist: (productId: string) => boolean;
-  toggleWishlist: (productId: string) => Promise<boolean>;
+  toggleWishlist: (product: string | LocalProductSnapshot) => Promise<boolean>;
   refreshWishlist: () => Promise<void>;
   loading: boolean;
 };
@@ -18,20 +23,25 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
+  const isServerProductId = (productId: string) => /^[a-f\d]{24}$/i.test(productId);
+
   const refreshWishlist = useCallback(async () => {
+    const localItems = await getLocalWishlist();
+    const localIds = localItems.map((item) => item.productId?._id).filter(Boolean);
+
     if (!user?._id) {
-      setWishlistIds(new Set());
+      setWishlistIds(new Set(localIds));
       return;
     }
     try {
       setLoading(true);
       const res = await api.get(`/wishlist/${user._id}`);
-      const ids = new Set<string>(
-        res.data.map((item: any) => item.productId?._id || item.productId).filter(Boolean)
-      );
+      const serverIds = res.data.map((item: any) => item.productId?._id || item.productId).filter(Boolean);
+      const ids = new Set<string>([...serverIds, ...localIds]);
       setWishlistIds(ids);
     } catch (error) {
       console.log(error);
+      setWishlistIds(new Set(localIds));
     } finally {
       setLoading(false);
     }
@@ -47,9 +57,21 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleWishlist = useCallback(
-    async (productId: string) => {
-      if (!user?._id) return false;
+    async (product: string | LocalProductSnapshot) => {
+      const productId = typeof product === "string" ? product : product._id;
       try {
+        if (!user?._id || !isServerProductId(productId)) {
+          if (typeof product === "string") return false;
+          const inWishlist = await toggleLocalWishlist(product);
+          setWishlistIds((prev) => {
+            const next = new Set(prev);
+            if (inWishlist) next.add(productId);
+            else next.delete(productId);
+            return next;
+          });
+          return inWishlist;
+        }
+
         const res = await api.post("/wishlist/toggle", {
           userId: user._id,
           productId,

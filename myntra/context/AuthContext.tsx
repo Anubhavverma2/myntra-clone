@@ -17,8 +17,17 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function postAuthSetup(userId: string) {
-  await mergeRecentlyViewedOnLogin(userId);
-  await registerForPushNotifications(userId);
+  try {
+    await mergeRecentlyViewedOnLogin(userId);
+  } catch (error) {
+    console.log("Recently viewed setup failed:", error);
+  }
+
+  try {
+    await registerForPushNotifications(userId);
+  } catch (error) {
+    console.log("Push notification setup failed:", error);
+  }
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -32,13 +41,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     (async () => {
-      const data = await getUserData();
-      if (data._id && data.name && data.email) {
-        setUser({ _id: data._id, name: data.name, email: data.email });
-        setIsAuthenticated(true);
-        await postAuthSetup(data._id);
+      try {
+        const data = await getUserData();
+        if (data._id && data.name && data.email) {
+          setUser({ _id: data._id, name: data.name, email: data.email });
+          setIsAuthenticated(true);
+          await postAuthSetup(data._id);
+        }
+      } catch (error) {
+        console.log("Auth restore failed:", error);
+      } finally {
+        setAuthReady(true);
       }
-      setAuthReady(true);
     })();
   }, []);
 

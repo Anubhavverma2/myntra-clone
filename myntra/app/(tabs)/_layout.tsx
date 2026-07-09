@@ -43,7 +43,7 @@ export default function TabLayout() {
               <Heart size={size} color={color} />
               {wishlistCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.badgeText}>{wishlistCount}</Text>
+                  <Text style={[styles.badgeText, { color: colors.onPrimary }]}>{wishlistCount}</Text>
                 </View>
               )}
             </View>
@@ -59,7 +59,7 @@ export default function TabLayout() {
               <ShoppingBag size={size} color={color} />
               {bagCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.badgeText}>{bagCount}</Text>
+                  <Text style={[styles.badgeText, { color: colors.onPrimary }]}>{bagCount}</Text>
                 </View>
               )}
             </View>
@@ -89,5 +89,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 3,
   },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  badgeText: { fontSize: 10, fontWeight: "bold" },
 });

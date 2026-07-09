@@ -13,6 +13,7 @@ import { Search, X } from "lucide-react-native";
 import { api } from "@/utils/api";
 import { useAppTheme } from "@/context/ThemeContext";
 import CategoryCard from "@/components/CategoryCard";
+import { DEFAULT_CATEGORIES, normalizeCategories } from "@/constants/categories";
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -30,10 +31,11 @@ export default function CategoriesScreen() {
         setIsLoading(true);
         setError("");
         const res = await api.get("/category");
-        setCategories(res.data);
+        setCategories(normalizeCategories(res.data));
       } catch (err) {
         console.log(err);
-        setError("Unable to load categories. Please try again.");
+        setCategories(DEFAULT_CATEGORIES);
+        setError("");
       } finally {
         setIsLoading(false);
       }
@@ -122,11 +124,11 @@ const createStyles = (colors: any) =>
       flexWrap: "wrap",
       justifyContent: "space-between",
       paddingHorizontal: 15,
-      paddingBottom: 24,
+      paddingBottom: 96,
     },
     center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
     errorText: { color: colors.textSecondary, textAlign: "center", marginBottom: 16 },
     emptyText: { color: colors.textSecondary, fontSize: 16 },
     retryBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 4 },
-    retryText: { color: "#fff", fontWeight: "700" },
+    retryText: { color: colors.onPrimary, fontWeight: "700" },
   });

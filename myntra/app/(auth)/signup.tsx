@@ -74,7 +74,7 @@ export default function Signup() {
     try {
       setisloading(true);
       await Signup(formData.fullName, formData.email, formData.password);
-      router.replace("/(tabs)/index");
+      router.replace("/(tabs)");
     } catch (error: any) {
       console.error(error);
       const message =
@@ -266,26 +266,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  button: {
-    backgroundColor: "#ff3f6c",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 20,
-  },
   disabledButton: {
     opacity: 0.6,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  errorText: {
-    color: "#ff3f6c",
-    marginTop: 12,
-    textAlign: "center",
-    fontSize: 14,
   },
   loginLink: {
     marginTop: 20,

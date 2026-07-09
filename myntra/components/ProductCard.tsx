@@ -41,31 +41,46 @@ export default function ProductCard({
   const router = useRouter();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addToBag } = useBag();
-  const { requireAuth } = useRequireAuth();
+  const { requireAuth, isLoggedIn } = useRequireAuth();
   const [wishlistLoading, setWishlistLoading] = React.useState(false);
   const [bagLoading, setBagLoading] = React.useState(false);
 
   const inWishlist = isInWishlist(product._id);
+  const isServerProduct = /^[a-f\d]{24}$/i.test(product._id);
   const styles = createStyles(colors, width);
 
   const handleWishlist = async (e?: any) => {
     e?.stopPropagation?.();
-    requireAuth("save items to wishlist", async () => {
+    const save = async () => {
       setWishlistLoading(true);
-      await toggleWishlist(product._id);
+      await toggleWishlist(product);
       setWishlistLoading(false);
-    });
+    };
+
+    if (isServerProduct && !isLoggedIn) {
+      requireAuth("save items to wishlist", save);
+      return;
+    }
+
+    await save();
   };
 
   const handleAddToBag = async (e?: any) => {
     e?.stopPropagation?.();
-    requireAuth("add items to bag", async () => {
+    const add = async () => {
       setBagLoading(true);
-      const ok = await addToBag(product._id, product.sizes?.[0]);
+      const ok = await addToBag(product, product.sizes?.[0]);
       setBagLoading(false);
       if (ok) Alert.alert("Added", `${product.name} added to your bag.`);
       else Alert.alert("Error", "Could not add to bag.");
-    });
+    };
+
+    if (isServerProduct && !isLoggedIn) {
+      requireAuth("add items to bag", add);
+      return;
+    }
+
+    await add();
   };
 
   return (
@@ -96,10 +111,10 @@ export default function ProductCard({
         {showAddToBag && (
           <TouchableOpacity style={styles.addBtn} onPress={handleAddToBag} disabled={bagLoading}>
             {bagLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
               <>
-                <ShoppingBag size={14} color="#fff" />
+                <ShoppingBag size={14} color={colors.onPrimary} />
                 <Text style={styles.addBtnText}>ADD TO BAG</Text>
               </>
             )}
@@ -120,7 +135,7 @@ const createStyles = (colors: ThemeColors, width: `${number}%` | number) =>
       borderWidth: 1,
       borderColor: colors.border,
       overflow: "hidden",
-      shadowColor: "#000",
+      shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.08,
       shadowRadius: 6,
@@ -154,5 +169,5 @@ const createStyles = (colors: ThemeColors, width: `${number}%` | number) =>
       borderRadius: 4,
       gap: 6,
     },
-    addBtnText: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+    addBtnText: { color: colors.onPrimary, fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
   });

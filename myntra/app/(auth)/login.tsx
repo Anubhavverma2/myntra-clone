@@ -31,7 +31,7 @@ export default function Login() {
     try {
       setisloading(true);
       await login(identifier, password);
-      router.replace("/(tabs)/index");
+      router.replace("/(tabs)");
     } catch (error: any) {
       console.error(error);
       const message =

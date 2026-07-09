@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Heart, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
+import { addLocalBagItem, getLocalWishlist, removeLocalWishlistItem } from "@/utils/storage";
 
 export default function Wishlist() {
   const router = useRouter();
@@ -30,23 +31,31 @@ export default function Wishlist() {
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const fetchWishlist = async () => {
-    if (!user) return;
+  const fetchWishlist = useCallback(async () => {
     try {
       setIsLoading(true);
+      const localItems = await getLocalWishlist();
+      if (!user) {
+        setWishlist(localItems);
+        await refreshWishlist();
+        return;
+      }
+
       const res = await api.get(`/wishlist/${user._id}`);
-      setWishlist(res.data);
+      setWishlist([...res.data, ...localItems]);
       await refreshWishlist();
     } catch (error) {
       console.log(error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, refreshWishlist]);
 
-  useEffect(() => {
-    fetchWishlist();
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchWishlist();
+    }, [fetchWishlist])
+  );
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -67,7 +76,11 @@ export default function Wishlist() {
 
   const handleDelete = async (itemId: string) => {
     try {
-      await api.delete(`/wishlist/${itemId}`);
+      if (itemId.startsWith("local-wishlist-")) {
+        await removeLocalWishlistItem(itemId);
+      } else {
+        await api.delete(`/wishlist/${itemId}`);
+      }
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(itemId);
@@ -87,7 +100,13 @@ export default function Wishlist() {
         text: "Remove",
         style: "destructive",
         onPress: async () => {
-          await Promise.all([...selectedIds].map((id) => api.delete(`/wishlist/${id}`)));
+          await Promise.all(
+            [...selectedIds].map((id) =>
+              id.startsWith("local-wishlist-")
+                ? removeLocalWishlistItem(id)
+                : api.delete(`/wishlist/${id}`)
+            )
+          );
           setSelectedIds(new Set());
           setSelectionMode(false);
           fetchWishlist();
@@ -97,8 +116,24 @@ export default function Wishlist() {
   };
 
   const handleMoveToBag = (item: any) => {
+    const defaultSize = item.productId?.sizes?.[0] || "Free Size";
+    if (item._id?.startsWith("local-wishlist-")) {
+      Alert.alert("Move to Bag", `Add "${item.productId.name}" to bag?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Add to Bag",
+          onPress: async () => {
+            await addLocalBagItem(item.productId, defaultSize, 1);
+            await removeLocalWishlistItem(item._id);
+            fetchWishlist();
+            router.push("/bag");
+          },
+        },
+      ]);
+      return;
+    }
+
     requireAuth("move items to bag", () => {
-      const defaultSize = item.productId?.sizes?.[0] || "M";
       Alert.alert("Move to Bag", `Add "${item.productId.name}" to bag?`, [
         { text: "Cancel", style: "cancel" },
         {
@@ -122,7 +157,7 @@ export default function Wishlist() {
     });
   };
 
-  if (!user) {
+  if (!user && wishlist.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -130,7 +165,7 @@ export default function Wishlist() {
         </View>
         <View style={styles.emptyState}>
           <Heart size={64} color={colors.primary} />
-          <Text style={styles.emptyTitle}>Please login to view your wishlist</Text>
+          <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
           <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/login")}>
             <Text style={styles.primaryButtonText}>LOGIN</Text>
           </TouchableOpacity>
@@ -279,7 +314,7 @@ const createStyles = (colors: any) =>
       borderRadius: 4,
       marginTop: 20,
     },
-    primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+    primaryButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
     wishlistItem: {
       flexDirection: "row",
       backgroundColor: colors.card,

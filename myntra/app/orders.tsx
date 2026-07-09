@@ -343,6 +343,27 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 15,
   },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    marginTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#3e3e3e",
+    textAlign: "center",
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+  },
   orderCard: {
     backgroundColor: "#fff",
     borderRadius: 10,

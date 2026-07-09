@@ -67,7 +67,7 @@ export default function Profile() {
       <ScrollView style={styles.content}>
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
-            <User size={40} color="#fff" />
+            <User size={40} color={colors.onPrimary} />
           </View>
           <View style={styles.userDetails}>
             <Text style={styles.userName}>{user.name}</Text>
@@ -120,7 +120,7 @@ const createStyles = (colors: any) =>
       paddingVertical: 15,
       borderRadius: 4,
     },
-    loginButtonText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+    loginButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
     userInfo: { flexDirection: "row", alignItems: "center", padding: 20, backgroundColor: colors.surface },
     avatar: {
       width: 80,

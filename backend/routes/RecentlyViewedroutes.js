@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const RecentlyViewed = require("../models/RecentlyViewed");
 const Product = require("../models/Product");
 const { recordBrowsingHistory } = require("../services/recommendationEngine");
@@ -6,13 +7,9 @@ const router = express.Router();
 
 const MAX_ITEMS = 20;
 
-async function upsertView(userId, productId) {
-  await RecentlyViewed.findOneAndUpdate(
-    { userId, productId },
-    { viewedAt: new Date() },
-    { upsert: true, new: true }
-  );
+const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+async function trimRecentlyViewed(userId) {
   const count = await RecentlyViewed.countDocuments({ userId });
   if (count > MAX_ITEMS) {
     const excess = await RecentlyViewed.find({ userId })
@@ -23,11 +20,61 @@ async function upsertView(userId, productId) {
   }
 }
 
+async function upsertView(userId, productId, viewedAt = new Date()) {
+  await RecentlyViewed.findOneAndUpdate(
+    { userId, productId },
+    {
+      $setOnInsert: { userId, productId },
+      $max: { viewedAt: new Date(viewedAt) },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  await trimRecentlyViewed(userId);
+}
+
+async function bulkMergeViews(userId, localItems) {
+  const latestByProduct = new Map();
+
+  for (const item of localItems) {
+    if (!isObjectId(item?.productId)) continue;
+    const viewedAt = new Date(item.viewedAt || Date.now());
+    if (Number.isNaN(viewedAt.getTime())) continue;
+
+    const key = item.productId.toString();
+    const existing = latestByProduct.get(key);
+    if (!existing || viewedAt > existing) {
+      latestByProduct.set(key, viewedAt);
+    }
+  }
+
+  if (latestByProduct.size > 0) {
+    await RecentlyViewed.bulkWrite(
+      [...latestByProduct.entries()].map(([productId, viewedAt]) => ({
+        updateOne: {
+          filter: { userId, productId },
+          update: {
+            $setOnInsert: { userId, productId },
+            $max: { viewedAt },
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false }
+    );
+  }
+
+  await trimRecentlyViewed(userId);
+}
+
 router.post("/", async (req, res) => {
   try {
     const { userId, productId } = req.body;
     if (!userId || !productId) {
       return res.status(400).json({ message: "userId and productId required" });
+    }
+    if (!isObjectId(userId) || !isObjectId(productId)) {
+      return res.status(400).json({ message: "Invalid userId or productId" });
     }
 
     const product = await Product.findById(productId);
@@ -35,8 +82,7 @@ router.post("/", async (req, res) => {
 
     await upsertView(userId, productId);
     await recordBrowsingHistory(userId, product);
-    product.viewCount = (product.viewCount || 0) + 1;
-    await product.save();
+    await Product.updateOne({ _id: productId }, { $inc: { viewCount: 1 } });
 
     const items = await RecentlyViewed.find({ userId })
       .sort({ viewedAt: -1 })
@@ -51,7 +97,12 @@ router.post("/", async (req, res) => {
 
 router.get("/:userId", async (req, res) => {
   try {
+    if (!isObjectId(req.params.userId)) {
+      return res.status(400).json({ message: "Invalid userId" });
+    }
+
     const items = await RecentlyViewed.find({ userId: req.params.userId })
+      .limit(MAX_ITEMS)
       .sort({ viewedAt: -1 })
       .populate("productId");
     res.status(200).json(items);
@@ -65,41 +116,16 @@ router.post("/merge", async (req, res) => {
   try {
     const { userId, localItems = [] } = req.body;
     if (!userId) return res.status(400).json({ message: "userId required" });
-
-    for (const item of localItems) {
-      if (!item.productId) continue;
-      await upsertView(userId, item.productId);
+    if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
+    if (!Array.isArray(localItems)) {
+      return res.status(400).json({ message: "localItems must be an array" });
     }
 
-    const serverItems = await RecentlyViewed.find({ userId }).lean();
-    const mergedMap = new Map();
-
-    for (const item of localItems) {
-      if (!item.productId) continue;
-      mergedMap.set(item.productId, new Date(item.viewedAt || Date.now()));
-    }
-    for (const item of serverItems) {
-      const key = item.productId.toString();
-      const existing = mergedMap.get(key);
-      const serverDate = new Date(item.viewedAt);
-      if (!existing || serverDate > existing) {
-        mergedMap.set(key, serverDate);
-      }
-    }
-
-    const sorted = [...mergedMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, MAX_ITEMS);
-
-    await RecentlyViewed.deleteMany({ userId });
-    if (sorted.length > 0) {
-      await RecentlyViewed.insertMany(
-        sorted.map(([productId, viewedAt]) => ({ userId, productId, viewedAt }))
-      );
-    }
+    await bulkMergeViews(userId, localItems);
 
     const items = await RecentlyViewed.find({ userId })
       .sort({ viewedAt: -1 })
+      .limit(MAX_ITEMS)
       .populate("productId");
 
     res.status(200).json(items);

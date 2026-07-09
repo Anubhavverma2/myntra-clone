@@ -16,16 +16,11 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
 import { getRecentlyViewed } from "@/utils/recentlyViewed";
 import ProductCard from "@/components/ProductCard";
+import { DEFAULT_CATEGORIES, isRealCategoryId, normalizeCategories } from "@/constants/categories";
 
 const deals = [
   { id: 1, title: "Under ₹599", image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500&auto=format&fit=crop" },
   { id: 2, title: "40-70% Off", image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=500&auto=format&fit=crop" },
-];
-
-const fallbackCategories = [
-  { _id: "cat1", name: "Men", image: "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop" },
-  { _id: "cat2", name: "Women", image: "https://images.unsplash.com/photo-1618244972963-dbad0c4abf18?w=500&auto=format&fit=crop" },
-  { _id: "cat3", name: "Kids", image: "https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=500&auto=format&fit=crop" },
 ];
 
 const fallbackProducts = [
@@ -58,7 +53,7 @@ export default function Home() {
           getRecentlyViewed(user?._id),
           api.get(user?._id ? `/recommendations/${user._id}` : "/recommendations"),
         ]);
-        setCategories(cat.data);
+        setCategories(normalizeCategories(cat.data));
         setProducts(prod.data);
         const recentRaw = recent;
         const mergedRecent = recentRaw.map((item: any) => {
@@ -78,7 +73,7 @@ export default function Home() {
     load();
   }, [user?._id]);
 
-  const categoriesToShow = categories.length > 0 ? categories : fallbackCategories;
+  const categoriesToShow = categories.length > 0 ? categories : DEFAULT_CATEGORIES;
   const productsToShow = products.length > 0 ? products : fallbackProducts;
 
   const handleProductPress = (productId: string) => {
@@ -131,7 +126,7 @@ export default function Home() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>SHOP BY CATEGORY</Text>
-          <TouchableOpacity style={styles.viewAll} onPress={() => router.push("/categories")}>
+          <TouchableOpacity style={styles.viewAll} onPress={() => router.push("/(tabs)/categories")}>
             <Text style={styles.viewAllText}>View All</Text>
             <ChevronRight size={20} color={colors.primary} />
           </TouchableOpacity>
@@ -141,7 +136,15 @@ export default function Home() {
             <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
           ) : (
             categoriesToShow.map((category: any) => (
-              <TouchableOpacity key={category._id} style={styles.categoryCard} onPress={() => router.push(`/category/${category._id}`)}>
+              <TouchableOpacity
+                key={category._id}
+                style={styles.categoryCard}
+                onPress={() =>
+                  isRealCategoryId(category._id)
+                    ? router.push(`/category/${category._id}`)
+                    : router.push("/(tabs)/categories")
+                }
+              >
                 <Image source={{ uri: category.image }} style={styles.categoryImage} />
                 <Text style={styles.categoryName}>{category.name}</Text>
               </TouchableOpacity>
@@ -222,7 +225,7 @@ const createStyles = (colors: any) =>
     dealCard: { width: 260, height: 140, marginRight: 12, borderRadius: 4, overflow: "hidden" },
     dealImage: { width: "100%", height: "100%" },
     dealOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: colors.overlay, padding: 12 },
-    dealTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+    dealTitle: { color: colors.onPrimary, fontSize: 16, fontWeight: "bold" },
     productsGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 },
     productCard: {
       width: "48%",

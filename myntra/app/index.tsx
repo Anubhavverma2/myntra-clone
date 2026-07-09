@@ -12,11 +12,16 @@ export default function SplashScreen() {
       if (hasNavigated.current) return;
       hasNavigated.current = true;
 
-      const session = await getUserData();
-      const isLoggedIn = !!(session._id && session.name && session.email);
+      let isLoggedIn = false;
+      try {
+        const session = await getUserData();
+        isLoggedIn = !!(session._id && session.name && session.email);
+      } catch (error) {
+        console.log("Splash session check failed:", error);
+      }
 
       if (isLoggedIn) {
-        router.replace("/(tabs)/index");
+        router.replace("/(tabs)");
       } else {
         router.replace("/login");
       }

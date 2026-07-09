@@ -64,20 +64,56 @@ export const getItem = getItemAsync;
 export const removeItem = deleteItemAsync;
 
 export const RECENTLY_VIEWED_KEY = "myntra_recently_viewed_local";
+export const LOCAL_WISHLIST_KEY = "myntra_local_wishlist";
+export const LOCAL_BAG_KEY = "myntra_local_bag";
 
 export type LocalRecentlyViewed = {
   productId: string;
   viewedAt: string;
 };
 
-export const getLocalRecentlyViewed = async (): Promise<LocalRecentlyViewed[]> => {
-  const raw = await getItemAsync(RECENTLY_VIEWED_KEY);
+export type LocalProductSnapshot = {
+  _id: string;
+  name: string;
+  brand: string;
+  price: number;
+  discount?: string;
+  images: string[];
+  sizes?: string[];
+};
+
+export type LocalBagItem = {
+  _id: string;
+  productId: LocalProductSnapshot;
+  size: string;
+  quantity: number;
+  section: "active";
+  version: number;
+};
+
+const parseJsonArray = <T>(raw: string | null): T[] => {
   if (!raw) return [];
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
+};
+
+const snapshotProduct = (product: LocalProductSnapshot): LocalProductSnapshot => ({
+  _id: product._id,
+  name: product.name,
+  brand: product.brand,
+  price: Number(product.price) || 0,
+  discount: product.discount || "",
+  images: Array.isArray(product.images) ? product.images : [],
+  sizes: Array.isArray(product.sizes) ? product.sizes : [],
+});
+
+export const getLocalRecentlyViewed = async (): Promise<LocalRecentlyViewed[]> => {
+  const raw = await getItemAsync(RECENTLY_VIEWED_KEY);
+  return parseJsonArray<LocalRecentlyViewed>(raw);
 };
 
 export const saveLocalRecentlyViewed = async (items: LocalRecentlyViewed[]) => {
@@ -93,4 +129,78 @@ export const addLocalRecentlyViewed = async (productId: string) => {
   filtered.unshift({ productId, viewedAt: new Date().toISOString() });
   await saveLocalRecentlyViewed(filtered);
   return filtered.slice(0, 20);
+};
+
+export const getLocalWishlist = async () => {
+  const raw = await getItemAsync(LOCAL_WISHLIST_KEY);
+  return parseJsonArray<{ _id: string; productId: LocalProductSnapshot }>(raw);
+};
+
+export const toggleLocalWishlist = async (product: LocalProductSnapshot) => {
+  const items = await getLocalWishlist();
+  const exists = items.some((item) => item.productId._id === product._id);
+  const next = exists
+    ? items.filter((item) => item.productId._id !== product._id)
+    : [{ _id: `local-wishlist-${product._id}`, productId: snapshotProduct(product) }, ...items];
+
+  await setItemAsync(LOCAL_WISHLIST_KEY, JSON.stringify(next));
+  return !exists;
+};
+
+export const removeLocalWishlistItem = async (itemId: string) => {
+  const items = await getLocalWishlist();
+  const next = items.filter((item) => item._id !== itemId && item.productId._id !== itemId);
+  await setItemAsync(LOCAL_WISHLIST_KEY, JSON.stringify(next));
+  return next;
+};
+
+export const getLocalBagItems = async (): Promise<LocalBagItem[]> => {
+  const raw = await getItemAsync(LOCAL_BAG_KEY);
+  return parseJsonArray<LocalBagItem>(raw);
+};
+
+export const saveLocalBagItems = async (items: LocalBagItem[]) => {
+  await setItemAsync(LOCAL_BAG_KEY, JSON.stringify(items));
+};
+
+export const addLocalBagItem = async (
+  product: LocalProductSnapshot,
+  size = "Free Size",
+  quantity = 1
+) => {
+  const items = await getLocalBagItems();
+  const existing = items.find((item) => item.productId._id === product._id && item.size === size);
+
+  if (existing) {
+    existing.quantity += quantity;
+    existing.version += 1;
+  } else {
+    items.unshift({
+      _id: `local-bag-${product._id}-${size}`,
+      productId: snapshotProduct(product),
+      size,
+      quantity,
+      section: "active",
+      version: 0,
+    });
+  }
+
+  await saveLocalBagItems(items);
+  return items;
+};
+
+export const updateLocalBagQuantity = async (itemId: string, quantity: number) => {
+  const items = await getLocalBagItems();
+  const next = items.map((item) =>
+    item._id === itemId ? { ...item, quantity, version: item.version + 1 } : item
+  );
+  await saveLocalBagItems(next);
+  return next;
+};
+
+export const removeLocalBagItem = async (itemId: string) => {
+  const items = await getLocalBagItems();
+  const next = items.filter((item) => item._id !== itemId);
+  await saveLocalBagItems(next);
+  return next;
 };

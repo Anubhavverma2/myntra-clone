@@ -1,10 +1,8 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { ThemeColors } from "@/constants/theme";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = (SCREEN_WIDTH - 45) / 2;
+import { isRealCategoryId } from "@/constants/categories";
 
 export type CategoryItem = {
   _id: string;
@@ -26,7 +24,9 @@ export default function CategoryCard({ category, colors }: CategoryCardProps) {
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.92}
-      onPress={() => router.push(`/category/${category._id}`)}
+      onPress={() => {
+        if (isRealCategoryId(category._id)) router.push(`/category/${category._id}`);
+      }}
     >
       <Image source={{ uri: category.image }} style={styles.image} />
       <View style={styles.overlay}>
@@ -44,17 +44,17 @@ export default function CategoryCard({ category, colors }: CategoryCardProps) {
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     card: {
-      width: CARD_WIDTH,
-      height: CARD_WIDTH * 1.15,
-      borderRadius: 12,
+      width: "48%",
+      height: 168,
+      borderRadius: 10,
       overflow: "hidden",
-      marginBottom: 15,
+      marginBottom: 14,
       backgroundColor: colors.card,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-      elevation: 5,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 5,
+      elevation: 3,
     },
     image: { width: "100%", height: "100%", resizeMode: "cover" },
     overlay: {
@@ -62,9 +62,11 @@ const createStyles = (colors: ThemeColors) =>
       bottom: 0,
       left: 0,
       right: 0,
-      padding: 12,
-      backgroundColor: "rgba(40,44,63,0.55)",
+      minHeight: 52,
+      padding: 10,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(40,44,63,0.62)",
     },
-    name: { color: "#fff", fontSize: 18, fontWeight: "700", letterSpacing: 0.3 },
-    sub: { color: "rgba(255,255,255,0.85)", fontSize: 11, marginTop: 3 },
+    name: { color: colors.onPrimary, fontSize: 16, fontWeight: "700", letterSpacing: 0.2 },
+    sub: { color: colors.onPrimary, opacity: 0.85, fontSize: 10, marginTop: 3 },
   });

@@ -1,12 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "@/utils/api";
 import { useAuth } from "@/context/AuthContext";
+import {
+  addLocalBagItem,
+  getLocalBagItems,
+  LocalProductSnapshot,
+} from "@/utils/storage";
 
 type BagContextType = {
   bagCount: number;
   bagTotal: number;
   refreshBag: () => Promise<void>;
-  addToBag: (productId: string, size?: string, quantity?: number) => Promise<boolean>;
+  addToBag: (product: string | LocalProductSnapshot, size?: string, quantity?: number) => Promise<boolean>;
   loading: boolean;
 };
 
@@ -18,20 +23,31 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
   const [bagTotal, setBagTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const isServerProductId = (productId: string) => /^[a-f\d]{24}$/i.test(productId);
+
   const refreshBag = useCallback(async () => {
+    const localItems = await getLocalBagItems();
+    const localCount = localItems.reduce((sum, item) => sum + item.quantity, 0);
+    const localTotal = localItems.reduce(
+      (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+      0
+    );
+
     if (!user?._id) {
-      setBagCount(0);
-      setBagTotal(0);
+      setBagCount(localCount);
+      setBagTotal(localTotal);
       return;
     }
     try {
       setLoading(true);
       const res = await api.get(`/bag/${user._id}`);
       const active = res.data.active || [];
-      setBagCount(active.reduce((sum: number, item: any) => sum + item.quantity, 0));
-      setBagTotal(res.data.total || 0);
+      setBagCount(active.reduce((sum: number, item: any) => sum + item.quantity, 0) + localCount);
+      setBagTotal((res.data.total || 0) + localTotal);
     } catch (error) {
       console.log(error);
+      setBagCount(localCount);
+      setBagTotal(localTotal);
     } finally {
       setLoading(false);
     }
@@ -42,9 +58,16 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
   }, [refreshBag]);
 
   const addToBag = useCallback(
-    async (productId: string, size?: string, quantity = 1) => {
-      if (!user?._id) return false;
+    async (product: string | LocalProductSnapshot, size?: string, quantity = 1) => {
+      const productId = typeof product === "string" ? product : product._id;
       try {
+        if (!user?._id || !isServerProductId(productId)) {
+          if (typeof product === "string") return false;
+          await addLocalBagItem(product, size || product.sizes?.[0] || "Free Size", quantity);
+          await refreshBag();
+          return true;
+        }
+
         let resolvedSize = size;
         if (!resolvedSize) {
           const productRes = await api.get(`/product/${productId}`);

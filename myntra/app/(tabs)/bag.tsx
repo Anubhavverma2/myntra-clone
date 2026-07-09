@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useBag } from "@/context/BagContext";
 import { api } from "@/utils/api";
+import { getLocalBagItems, removeLocalBagItem, updateLocalBagQuantity } from "@/utils/storage";
 
 export default function Bag() {
   const router = useRouter();
@@ -27,11 +28,25 @@ export default function Bag() {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const fetchBag = useCallback(async () => {
-    if (!user) return;
     try {
       setIsLoading(true);
+      const localItems = await getLocalBagItems();
+      const localTotal = localItems.reduce(
+        (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+        0
+      );
+
+      if (!user) {
+        setBagData({ active: localItems, total: localTotal });
+        await refreshBag();
+        return;
+      }
+
       const res = await api.get(`/bag/${user._id}`);
-      setBagData({ active: res.data.active || [], total: res.data.total || 0 });
+      setBagData({
+        active: [...(res.data.active || []), ...localItems],
+        total: (res.data.total || 0) + localTotal,
+      });
       await refreshBag();
     } catch (error) {
       console.log(error);
@@ -50,7 +65,11 @@ export default function Bag() {
     const newQty = item.quantity + delta;
     if (newQty < 1) return;
     try {
-      await api.patch(`/bag/${item._id}`, { quantity: newQty, version: item.version });
+      if (item._id?.startsWith("local-bag-")) {
+        await updateLocalBagQuantity(item._id, newQty);
+      } else {
+        await api.patch(`/bag/${item._id}`, { quantity: newQty, version: item.version });
+      }
       fetchBag();
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.message || "Could not update quantity");
@@ -59,17 +78,21 @@ export default function Bag() {
   };
 
   const handleDelete = async (itemId: string) => {
-    await api.delete(`/bag/${itemId}`);
+    if (itemId.startsWith("local-bag-")) {
+      await removeLocalBagItem(itemId);
+    } else {
+      await api.delete(`/bag/${itemId}`);
+    }
     fetchBag();
   };
 
-  if (!user) {
+  if (!user && bagData.active.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}><Text style={styles.headerTitle}>Shopping Bag</Text></View>
         <View style={styles.emptyState}>
           <ShoppingBag size={64} color={colors.primary} />
-          <Text style={styles.emptyTitle}>Please login to view your bag</Text>
+          <Text style={styles.emptyTitle}>Your bag is empty</Text>
           <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/login")}>
             <Text style={styles.primaryButtonText}>LOGIN</Text>
           </TouchableOpacity>
@@ -184,5 +207,5 @@ const createStyles = (colors: any) =>
     totalLabel: { fontSize: 16, color: colors.textSecondary },
     totalAmount: { fontSize: 20, fontWeight: "800", color: colors.text },
     primaryButton: { backgroundColor: colors.primary, padding: 15, borderRadius: 4, alignItems: "center" },
-    primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700", letterSpacing: 0.8 },
+    primaryButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: "700", letterSpacing: 0.8 },
   });

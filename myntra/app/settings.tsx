@@ -3,17 +3,16 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-nati
 import { useRouter } from "expo-router";
 import { ChevronLeft, Moon, Sun, Palette } from "lucide-react-native";
 import { useAppTheme } from "@/context/ThemeContext";
-import { ThemeName } from "@/constants/theme";
 
-const themeOptions: { name: ThemeName; label: string; icon: any }[] = [
-  { name: "myntra", label: "Myntra Light", icon: Palette },
-  { name: "light", label: "Classic Light", icon: Sun },
-  { name: "dark", label: "Dark Mode", icon: Moon },
-];
+const themeIcons = {
+  palette: Palette,
+  sun: Sun,
+  moon: Moon,
+};
 
 export default function Settings() {
   const router = useRouter();
-  const { colors, themeName, setTheme } = useAppTheme();
+  const { colors, themeName, options, setTheme } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
@@ -32,8 +31,8 @@ export default function Settings() {
           Theme is saved automatically. Dark mode meets accessibility contrast standards.
         </Text>
 
-        {themeOptions.map((option) => {
-          const Icon = option.icon;
+        {options.map((option) => {
+          const Icon = themeIcons[option.icon];
           const active = themeName === option.name;
           return (
             <TouchableOpacity
@@ -42,9 +41,12 @@ export default function Settings() {
               onPress={() => setTheme(option.name)}
             >
               <Icon size={22} color={active ? colors.primary : colors.text} />
-              <Text style={[styles.themeLabel, active && { color: colors.primary }]}>
-                {option.label}
-              </Text>
+              <View style={styles.themeCopy}>
+                <Text style={[styles.themeLabel, active && { color: colors.primary }]}>
+                  {option.label}
+                </Text>
+                <Text style={styles.themeDescription}>{option.description}</Text>
+              </View>
               {active && <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />}
             </TouchableOpacity>
           );
@@ -83,6 +85,8 @@ const createStyles = (colors: any) =>
       gap: 12,
     },
     themeOptionActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-    themeLabel: { flex: 1, fontSize: 16, color: colors.text },
+    themeCopy: { flex: 1 },
+    themeLabel: { fontSize: 16, color: colors.text },
+    themeDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 3 },
     activeDot: { width: 10, height: 10, borderRadius: 5 },
   });

@@ -189,10 +189,10 @@ export default function ProductDetails() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.addBtn} onPress={handleAddToBag} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <>
-              <ShoppingBag size={20} color="#fff" />
+              <ShoppingBag size={20} color={colors.onPrimary} />
               <Text style={styles.addBtnText}>ADD TO BAG</Text>
             </>
           )}
@@ -222,7 +222,7 @@ const createStyles = (colors: any) =>
     productImage: { height: 420, backgroundColor: colors.inputBg },
     pagination: { position: "absolute", bottom: 14, flexDirection: "row", width: "100%", justifyContent: "center" },
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.5)", marginHorizontal: 4 },
-    dotActive: { backgroundColor: "#fff", width: 10, height: 10, borderRadius: 5 },
+    dotActive: { backgroundColor: colors.onPrimary, width: 10, height: 10, borderRadius: 5 },
     content: { padding: 20 },
     brand: { fontSize: 15, color: colors.textSecondary, marginBottom: 4 },
     name: { fontSize: 20, fontWeight: "700", color: colors.text, marginBottom: 10 },
@@ -275,5 +275,5 @@ const createStyles = (colors: any) =>
       gap: 8,
       height: 52,
     },
-    addBtnText: { color: "#fff", fontSize: 14, fontWeight: "700", letterSpacing: 0.8 },
+    addBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: "700", letterSpacing: 0.8 },
   });

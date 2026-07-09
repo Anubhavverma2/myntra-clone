@@ -114,7 +114,7 @@ export default function Checkout() {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.placeOrderButton} onPress={handlePlaceOrder} disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.placeOrderButtonText}>PLACE ORDER</Text>
           )}
@@ -144,5 +144,5 @@ const createStyles = (colors: any) =>
     totalValue: { fontSize: 17, fontWeight: "bold", color: colors.primary },
     footer: { padding: 15, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
     placeOrderButton: { backgroundColor: colors.primary, padding: 15, borderRadius: 4, alignItems: "center" },
-    placeOrderButtonText: { color: "#fff", fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
+    placeOrderButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: "bold", letterSpacing: 1 },
   });

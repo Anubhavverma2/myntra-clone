@@ -1,12 +1,21 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme as useSystemColorScheme } from "react-native";
-import { getItem, setItem } from "@/utils/storage";
-import { THEME_STORAGE_KEY, ThemeColors, ThemeName, themes } from "@/constants/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  isThemeName,
+  THEME_STORAGE_KEY,
+  ThemeColors,
+  ThemeName,
+  themeDefinitions,
+  themeOptions,
+  themes,
+} from "@/constants/theme";
 
 type ThemeContextType = {
   themeName: ThemeName;
   colors: ThemeColors;
   isDark: boolean;
+  options: typeof themeOptions;
   setTheme: (name: ThemeName) => Promise<void>;
   toggleDarkMode: () => Promise<void>;
 };
@@ -20,21 +29,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const saved = await getItem(THEME_STORAGE_KEY);
-      if (saved === "light" || saved === "dark" || saved === "myntra") {
-        setThemeName(saved);
-      } else if (systemScheme === "dark") {
-        setThemeName("dark");
-      } else {
+      try {
+        const saved = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (isThemeName(saved)) {
+          setThemeName(saved);
+        } else if (systemScheme === "dark") {
+          setThemeName("dark");
+        } else {
+          setThemeName("myntra");
+        }
+      } catch (error) {
+        console.log("Theme restore failed:", error);
         setThemeName("myntra");
+      } finally {
+        setReady(true);
       }
-      setReady(true);
     })();
   }, [systemScheme]);
 
   const setTheme = async (name: ThemeName) => {
     setThemeName(name);
-    await setItem(THEME_STORAGE_KEY, name);
+    await AsyncStorage.setItem(THEME_STORAGE_KEY, name);
   };
 
   const toggleDarkMode = async () => {
@@ -46,14 +61,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     () => ({
       themeName,
       colors: themes[themeName],
-      isDark: themeName === "dark",
+      isDark: themeDefinitions[themeName].dark,
+      options: themeOptions,
       setTheme,
       toggleDarkMode,
     }),
     [themeName]
   );
-
-  if (!ready) return null;
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

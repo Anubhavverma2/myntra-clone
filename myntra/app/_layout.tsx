@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 import React from "react";
 
@@ -24,24 +25,28 @@ function AppStack() {
 
   return (
     <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <WishlistProvider>
-          <BagProvider>
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-              <Stack.Screen name="index" options={{ animation: "none" }} />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="category/[id]" />
-              <Stack.Screen name="product/[id]" />
-              <Stack.Screen name="checkout" />
-              <Stack.Screen name="orders" />
-              <Stack.Screen name="transactions" />
-              <Stack.Screen name="settings" />
-            </Stack>
-            <StatusBar style={isDark ? "light" : "dark"} />
-          </BagProvider>
-        </WishlistProvider>
-      </AuthProvider>
+      <View style={[styles.appStage, { backgroundColor: colors.appFrameBackground }]}>
+        <View style={[styles.mobileFrame, { backgroundColor: colors.background }]}>
+          <AuthProvider>
+            <WishlistProvider>
+              <BagProvider>
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+                  <Stack.Screen name="index" options={{ animation: "none" }} />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="category/[id]" />
+                  <Stack.Screen name="product/[id]" />
+                  <Stack.Screen name="checkout" />
+                  <Stack.Screen name="orders" />
+                  <Stack.Screen name="transactions" />
+                  <Stack.Screen name="settings" />
+                </Stack>
+                <StatusBar style={isDark ? "light" : "dark"} />
+              </BagProvider>
+            </WishlistProvider>
+          </AuthProvider>
+        </View>
+      </View>
     </NavigationThemeProvider>
   );
 }
@@ -63,3 +68,16 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  appStage: {
+    flex: 1,
+    alignItems: Platform.OS === "web" ? "center" : "stretch",
+  },
+  mobileFrame: {
+    flex: 1,
+    width: "100%",
+    maxWidth: Platform.OS === "web" ? 430 : undefined,
+    overflow: "hidden",
+  },
+});
