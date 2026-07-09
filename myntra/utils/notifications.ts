@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { api } from "@/utils/api";
 
@@ -24,7 +25,11 @@ export async function registerForPushNotifications(userId: string) {
   if (finalStatus !== "granted") return null;
 
   try {
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
     const token = tokenData.data;
 
     await api.post("/notifications/register-token", {
@@ -49,13 +54,20 @@ export async function scheduleCartAbandonmentReminder(userId: string) {
 }
 
 export function setupNotificationListeners(
-  onNotificationReceived?: (notification: Notifications.Notification) => void
+  onNotificationReceived?: (notification: Notifications.Notification) => void,
+  onNotificationResponse?: (response: Notifications.NotificationResponse) => void
 ) {
   const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
     onNotificationReceived?.(notification);
   });
 
-  const responseSub = Notifications.addNotificationResponseReceivedListener(() => {});
+  const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+    onNotificationResponse?.(response);
+  });
+
+  Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (response) onNotificationResponse?.(response);
+  });
 
   return () => {
     receivedSub.remove();

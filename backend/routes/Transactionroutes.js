@@ -1,15 +1,26 @@
 const express = require("express");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const Transaction = require("../models/Transaction");
 const TransactionAudit = require("../models/TransactionAudit");
 const router = express.Router();
+
+const VALID_STATUSES = new Set(["pending", "success", "failed", "refunded"]);
+const VALID_SORT_FIELDS = new Set(["createdAt", "amount", "status", "paymentMode"]);
+const VALID_PAYMENT_MODES = new Set(["UPI", "Card", "Net Banking", "COD", "Wallet"]);
+const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 async function logAudit(transactionId, event, details = {}) {
   await TransactionAudit.create({ transactionId, event, details });
 }
 
+function escapeCsv(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
 router.get("/user/:userId", async (req, res) => {
   try {
+    if (!isObjectId(req.params.userId)) return res.status(400).json({ message: "Invalid userId" });
     const {
       status,
       paymentMode,
@@ -20,24 +31,27 @@ router.get("/user/:userId", async (req, res) => {
     } = req.query;
 
     const filter = { userId: req.params.userId };
-    if (status) filter.status = status;
+    if (status && VALID_STATUSES.has(status)) filter.status = status;
     if (paymentMode) filter.paymentMode = paymentMode;
 
-    const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
-    const skip = (Math.max(parseInt(page, 10), 1) - 1) * parseInt(limit, 10);
+    const safeSortBy = VALID_SORT_FIELDS.has(sortBy) ? sortBy : "createdAt";
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const sort = { [safeSortBy]: sortOrder === "asc" ? 1 : -1, _id: -1 };
+    const skip = (safePage - 1) * safeLimit;
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(filter).sort(sort).skip(skip).limit(parseInt(limit, 10)).lean(),
+      Transaction.find(filter).sort(sort).skip(skip).limit(safeLimit).lean(),
       Transaction.countDocuments(filter),
     ]);
 
     res.status(200).json({
       transactions,
       pagination: {
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
+        page: safePage,
+        limit: safeLimit,
         total,
-        totalPages: Math.ceil(total / parseInt(limit, 10)),
+        totalPages: Math.ceil(total / safeLimit),
       },
     });
   } catch (error) {
@@ -52,6 +66,10 @@ router.post("/", async (req, res) => {
     if (!userId || !paymentMode || amount == null) {
       return res.status(400).json({ message: "Missing required fields" });
     }
+    if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
+    if (orderId && !isObjectId(orderId)) return res.status(400).json({ message: "Invalid orderId" });
+    if (!VALID_PAYMENT_MODES.has(paymentMode)) return res.status(400).json({ message: "Invalid payment mode" });
+    if (Number(amount) <= 0) return res.status(400).json({ message: "Amount must be positive" });
 
     const invoiceId = `INV-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
     const transaction = await Transaction.create({
@@ -59,7 +77,7 @@ router.post("/", async (req, res) => {
       orderId,
       invoiceId,
       paymentMode,
-      amount,
+      amount: Number(amount),
       status: "pending",
     });
 
@@ -77,19 +95,24 @@ router.post("/webhook", async (req, res) => {
     if (!webhookId || !transactionId || !status) {
       return res.status(400).json({ message: "Missing webhook fields" });
     }
+    if (!isObjectId(transactionId)) return res.status(400).json({ message: "Invalid transactionId" });
+    if (!VALID_STATUSES.has(status)) return res.status(400).json({ message: "Invalid status" });
 
     const existing = await Transaction.findOne({ webhookId });
     if (existing) {
       return res.status(200).json({ message: "Webhook already processed", transaction: existing });
     }
 
-    const transaction = await Transaction.findById(transactionId);
+    const transaction = await Transaction.findOneAndUpdate(
+      { _id: transactionId, webhookId: { $exists: false } },
+      {
+        webhookId,
+        status,
+        ...(amount != null ? { amount: Number(amount) } : {}),
+      },
+      { new: true }
+    );
     if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-
-    transaction.webhookId = webhookId;
-    transaction.status = status;
-    if (amount != null) transaction.amount = amount;
-    await transaction.save();
 
     await logAudit(transaction._id, "webhook_received", { status, webhookId });
     if (status === "success") await logAudit(transaction._id, "success");
@@ -98,6 +121,10 @@ router.post("/webhook", async (req, res) => {
 
     res.status(200).json(transaction);
   } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.webhookId) {
+      const transaction = await Transaction.findOne({ webhookId: req.body.webhookId });
+      return res.status(200).json({ message: "Webhook already processed", transaction });
+    }
     console.log(error);
     res.status(500).json({ message: "Something went wrong" });
   }
@@ -105,6 +132,9 @@ router.post("/webhook", async (req, res) => {
 
 router.get("/receipt/:transactionId", async (req, res) => {
   try {
+    if (!isObjectId(req.params.transactionId)) {
+      return res.status(400).json({ message: "Invalid transactionId" });
+    }
     const transaction = await Transaction.findById(req.params.transactionId);
     if (!transaction) return res.status(404).json({ message: "Transaction not found" });
 
@@ -113,7 +143,8 @@ router.get("/receipt/:transactionId", async (req, res) => {
       "================================",
       `Invoice ID: ${transaction.invoiceId}`,
       `Transaction ID: ${transaction._id}`,
-      `Date: ${transaction.createdAt.toISOString()}`,
+      `Generated At: ${new Date().toISOString()}`,
+      `Paid At: ${transaction.updatedAt.toISOString()}`,
       `Payment Mode: ${transaction.paymentMode}`,
       `Amount: ₹${transaction.amount}`,
       `Status: ${transaction.status.toUpperCase()}`,
@@ -142,19 +173,28 @@ router.get("/receipt/:transactionId", async (req, res) => {
 
 router.get("/export/:userId/csv", async (req, res) => {
   try {
+    if (!isObjectId(req.params.userId)) return res.status(400).json({ message: "Invalid userId" });
+    const filter = { userId: req.params.userId };
+    if (req.query.status && VALID_STATUSES.has(req.query.status)) filter.status = req.query.status;
+    if (req.query.paymentMode) filter.paymentMode = req.query.paymentMode;
+
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="transactions-${req.params.userId}.csv"`);
 
     res.write("Invoice ID,Amount,Payment Mode,Status,Date\n");
 
-    const cursor = Transaction.find({ userId: req.params.userId })
+    const cursor = Transaction.find(filter)
       .sort({ createdAt: -1 })
       .cursor();
 
     for await (const txn of cursor) {
-      res.write(
-        `"${txn.invoiceId}",${txn.amount},"${txn.paymentMode}","${txn.status}","${txn.createdAt.toISOString()}"\n`
-      );
+      res.write([
+        escapeCsv(txn.invoiceId),
+        txn.amount,
+        escapeCsv(txn.paymentMode),
+        escapeCsv(txn.status),
+        escapeCsv(txn.createdAt.toISOString()),
+      ].join(",") + "\n");
     }
 
     res.end();
@@ -166,6 +206,9 @@ router.get("/export/:userId/csv", async (req, res) => {
 
 router.get("/audit/:transactionId", async (req, res) => {
   try {
+    if (!isObjectId(req.params.transactionId)) {
+      return res.status(400).json({ message: "Invalid transactionId" });
+    }
     const logs = await TransactionAudit.find({ transactionId: req.params.transactionId }).sort({
       createdAt: 1,
     });

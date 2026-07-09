@@ -19,6 +19,8 @@ const TransactionSchema = new mongoose.Schema(
 );
 
 TransactionSchema.index({ userId: 1, createdAt: -1 });
-TransactionSchema.index({ status: 1 });
+TransactionSchema.index({ userId: 1, status: 1, createdAt: -1 });
+TransactionSchema.index({ userId: 1, paymentMode: 1, createdAt: -1 });
+TransactionSchema.index({ webhookId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Transaction", TransactionSchema);

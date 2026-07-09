@@ -10,11 +10,12 @@ const NotificationJobSchema = new mongoose.Schema(
     scheduledAt: { type: Date, default: Date.now },
     status: {
       type: String,
-      enum: ["pending", "sent", "failed", "cancelled"],
+      enum: ["pending", "processing", "sent", "failed", "cancelled"],
       default: "pending",
     },
     attempts: { type: Number, default: 0 },
     maxAttempts: { type: Number, default: 3 },
+    sentAt: Date,
     lastError: String,
   },
   { timestamps: true }

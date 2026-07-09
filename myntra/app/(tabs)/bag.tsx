@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { ShoppingBag, Minus, Plus, Trash2 } from "lucide-react-native";
+import { ShoppingBag, Minus, Plus, Trash2, Bookmark } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useBag } from "@/context/BagContext";
@@ -23,7 +23,7 @@ export default function Bag() {
   const { colors } = useAppTheme();
   const { refreshBag } = useBag();
   const [isLoading, setIsLoading] = useState(false);
-  const [bagData, setBagData] = useState<any>({ active: [], total: 0 });
+  const [bagData, setBagData] = useState<any>({ active: [], saved: [], total: 0 });
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -37,7 +37,7 @@ export default function Bag() {
       );
 
       if (!user) {
-        setBagData({ active: localItems, total: localTotal });
+        setBagData({ active: localItems, saved: [], total: localTotal });
         await refreshBag();
         return;
       }
@@ -45,6 +45,7 @@ export default function Bag() {
       const res = await api.get(`/bag/${user._id}`);
       setBagData({
         active: [...(res.data.active || []), ...localItems],
+        saved: res.data.saved || [],
         total: (res.data.total || 0) + localTotal,
       });
       await refreshBag();
@@ -84,6 +85,17 @@ export default function Bag() {
       await api.delete(`/bag/${itemId}`);
     }
     fetchBag();
+  };
+
+  const moveSection = async (item: any, section: "active" | "saved") => {
+    if (item._id?.startsWith("local-bag-")) return;
+    try {
+      await api.patch(`/bag/${item._id}/move`, { section });
+      fetchBag();
+      await refreshBag();
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.message || "Could not move item");
+    }
   };
 
   if (!user && bagData.active.length === 0) {
@@ -146,9 +158,40 @@ export default function Bag() {
                     <Trash2 size={18} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
+                {!item._id?.startsWith("local-bag-") && (
+                  <TouchableOpacity style={styles.saveLaterBtn} onPress={() => moveSection(item, "saved")}>
+                    <Bookmark size={16} color={colors.primary} />
+                    <Text style={styles.saveLaterText}>SAVE FOR LATER</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))
+        )}
+
+        {bagData.saved.length > 0 && (
+          <View style={styles.savedSection}>
+            <Text style={styles.savedTitle}>Saved For Later ({bagData.saved.length})</Text>
+            {bagData.saved.map((item: any) => (
+              <View key={item._id} style={styles.bagItem}>
+                <Image source={{ uri: item.productId?.images?.[0] }} style={styles.itemImage} />
+                <View style={styles.itemInfo}>
+                  <Text style={styles.brandName}>{item.productId?.brand}</Text>
+                  <Text style={styles.itemName}>{item.productId?.name}</Text>
+                  <Text style={styles.itemSize}>Size: {item.size}</Text>
+                  <Text style={styles.itemPrice}>₹{item.productId?.price}</Text>
+                  <View style={styles.savedActions}>
+                    <TouchableOpacity style={styles.restoreBtn} onPress={() => moveSection(item, "active")}>
+                      <Text style={styles.restoreText}>MOVE TO BAG</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.iconBtn} onPress={() => handleDelete(item._id)}>
+                      <Trash2 size={18} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -202,6 +245,14 @@ const createStyles = (colors: any) =>
     },
     quantity: { marginHorizontal: 14, fontSize: 15, color: colors.text, fontWeight: "600" },
     removeBtn: { marginLeft: "auto", padding: 6 },
+    iconBtn: { padding: 6 },
+    saveLaterBtn: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 6 },
+    saveLaterText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+    savedSection: { marginTop: 12, paddingBottom: 20 },
+    savedTitle: { fontSize: 16, color: colors.text, fontWeight: "700", marginBottom: 12 },
+    savedActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    restoreBtn: { borderWidth: 1, borderColor: colors.primary, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
+    restoreText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
     footer: { padding: 15, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
     totalContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
     totalLabel: { fontSize: 16, color: colors.textSecondary },

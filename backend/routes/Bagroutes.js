@@ -19,25 +19,17 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Insufficient stock" });
     }
 
-    let existingItem = await Bag.findOne({ userId, productId, size, section });
-    if (existingItem) {
-      existingItem.quantity += quantity;
-      existingItem.version += 1;
-      existingItem.priceAtAdd = product.price;
-      const updatedItem = await existingItem.save();
-      return res.status(200).json(updatedItem);
-    }
+    const updatedItem = await Bag.findOneAndUpdate(
+      { userId, productId, size, section },
+      {
+        $inc: { quantity, version: 1 },
+        $set: { priceAtAdd: product.price },
+        $setOnInsert: { userId, productId, size, section },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-    const bagItem = new Bag({
-      userId,
-      productId,
-      size,
-      quantity,
-      section,
-      priceAtAdd: product.price,
-    });
-    const savedItem = await bagItem.save();
-    res.status(201).json(savedItem);
+    res.status(200).json(updatedItem);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Something went wrong" });

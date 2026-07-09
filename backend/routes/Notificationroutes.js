@@ -1,8 +1,11 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const DeviceToken = require("../models/DeviceToken");
 const NotificationJob = require("../models/NotificationJob");
 const { enqueueNotification } = require("../services/notificationQueue");
 const router = express.Router();
+
+const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 router.post("/register-token", async (req, res) => {
   try {
@@ -10,10 +13,14 @@ router.post("/register-token", async (req, res) => {
     if (!userId || !token) {
       return res.status(400).json({ message: "userId and token required" });
     }
+    if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
+    if (!/^ExponentPushToken\[.+\]$|^ExpoPushToken\[.+\]$/.test(token)) {
+      return res.status(400).json({ message: "Invalid Expo push token" });
+    }
 
     const device = await DeviceToken.findOneAndUpdate(
       { token },
-      { userId, platform, isValid: true },
+      { userId, platform, isValid: true, lastUsedAt: new Date() },
       { upsert: true, new: true }
     );
 
@@ -40,6 +47,7 @@ router.post("/send", async (req, res) => {
     if (!userId || !title || !body) {
       return res.status(400).json({ message: "Missing required fields" });
     }
+    if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
 
     const result = await enqueueNotification({ userId, title, body, data, type, scheduledAt });
     res.status(result.queued ? 201 : 429).json(result);
@@ -53,6 +61,7 @@ router.post("/schedule/cart-abandonment", async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ message: "userId required" });
+    if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
 
     const scheduledAt = new Date(Date.now() + 30 * 60 * 1000);
     const result = await enqueueNotification({
@@ -73,6 +82,7 @@ router.post("/schedule/cart-abandonment", async (req, res) => {
 
 router.get("/jobs/:userId", async (req, res) => {
   try {
+    if (!isObjectId(req.params.userId)) return res.status(400).json({ message: "Invalid userId" });
     const jobs = await NotificationJob.find({ userId: req.params.userId })
       .sort({ createdAt: -1 })
       .limit(50);

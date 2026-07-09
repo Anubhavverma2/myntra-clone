@@ -6,6 +6,7 @@ const DeviceTokenSchema = new mongoose.Schema(
     token: { type: String, required: true, unique: true },
     platform: { type: String, enum: ["ios", "android", "web"], default: "android" },
     isValid: { type: Boolean, default: true },
+    lastUsedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
