@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
+import { getLocalBagItems, saveLocalBagItems } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { CreditCard, MapPin, Truck } from "lucide-react-native";
 import {
@@ -19,6 +20,8 @@ import {
 export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [bagTotal, setBagTotal] = useState(0);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [localTotal, setLocalTotal] = useState(0);
   const [address, setAddress] = useState("123 Main Street, Mumbai, Maharashtra 400001");
   const router = useRouter();
   const { user } = useAuth();
@@ -28,7 +31,33 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!user) return;
-    api.get(`/bag/${user._id}`).then((res) => setBagTotal(res.data.total || 0)).catch(console.log);
+    const loadTotals = async () => {
+      try {
+        const [bagRes, localItems] = await Promise.all([
+          api.get(`/bag/${user._id}`),
+          getLocalBagItems(),
+        ]);
+        const nextServerTotal = bagRes.data.total || 0;
+        const nextLocalTotal = localItems.reduce(
+          (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+          0
+        );
+        setServerTotal(nextServerTotal);
+        setLocalTotal(nextLocalTotal);
+        setBagTotal(nextServerTotal + nextLocalTotal);
+      } catch (error) {
+        console.log(error);
+        const localItems = await getLocalBagItems();
+        const nextLocalTotal = localItems.reduce(
+          (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+          0
+        );
+        setServerTotal(0);
+        setLocalTotal(nextLocalTotal);
+        setBagTotal(nextLocalTotal);
+      }
+    };
+    loadTotals();
   }, [user]);
 
   const shipping = bagTotal > 0 ? 99 : 0;
@@ -39,17 +68,53 @@ export default function Checkout() {
     requireAuth("place an order", async () => {
       try {
         setLoading(true);
-        const validation = await api.post(`/bag/validate-checkout/${user!._id}`);
-        if (!validation.data.valid) {
-          Alert.alert("Checkout Issue", validation.data.issues.map((i: any) => i.message).join("\n"));
+        if (bagTotal <= 0) {
+          Alert.alert("Empty Bag", "Please add items before placing an order.");
           return;
         }
-        await api.post(`/order/create/${user!._id}`, {
-          shippingAddress: address,
-          paymentMethod: "UPI",
-        });
-        Alert.alert("Success", "Order placed successfully!");
-        router.push("/orders");
+
+        if (serverTotal > 0) {
+          const validation = await api.post(`/bag/validate-checkout/${user!._id}`);
+          if (!validation.data.valid) {
+            Alert.alert("Checkout Issue", validation.data.issues.map((i: any) => i.message).join("\n"));
+            return;
+          }
+          await api.post(`/order/create/${user!._id}`, {
+            shippingAddress: address,
+            paymentMethod: "UPI",
+          });
+        }
+
+        if (localTotal > 0) {
+          const txnRes = await api.post("/transactions", {
+            userId: user!._id,
+            paymentMode: "UPI",
+            amount: localTotal,
+          });
+          await api.post("/transactions/webhook", {
+            webhookId: `demo-${txnRes.data._id}`,
+            transactionId: txnRes.data._id,
+            status: "success",
+            amount: localTotal,
+          });
+          await saveLocalBagItems([]);
+        }
+
+        await api.post("/notifications/send", {
+          userId: user!._id,
+          title: "Order Placed Successfully!",
+          body: `Your order of ₹${grandTotal} has been confirmed.`,
+          data: { screen: serverTotal > 0 ? "orders" : "transactions" },
+        }).catch(console.log);
+
+        setServerTotal(0);
+        setLocalTotal(0);
+        setBagTotal(0);
+        Alert.alert("Order Placed 🎉", "Your order has been confirmed.", [
+          { text: "View Transactions", onPress: () => router.push("/transactions") },
+          { text: "OK", style: "cancel" },
+        ]);
+        router.push(serverTotal > 0 ? "/orders" : "/transactions");
       } catch (error: any) {
         Alert.alert("Error", error.response?.data?.message || "Order failed");
       } finally {

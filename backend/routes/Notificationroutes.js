@@ -33,8 +33,8 @@ router.post("/register-token", async (req, res) => {
 
 router.delete("/token/:token", async (req, res) => {
   try {
-    await DeviceToken.findOneAndUpdate({ token: req.params.token }, { isValid: false });
-    res.status(200).json({ message: "Token invalidated" });
+    await DeviceToken.findOneAndDelete({ token: req.params.token });
+    res.status(200).json({ message: "Token removed" });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Something went wrong" });
@@ -63,7 +63,7 @@ router.post("/schedule/cart-abandonment", async (req, res) => {
     if (!userId) return res.status(400).json({ message: "userId required" });
     if (!isObjectId(userId)) return res.status(400).json({ message: "Invalid userId" });
 
-    const scheduledAt = new Date(Date.now() + 30 * 60 * 1000);
+    const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const result = await enqueueNotification({
       userId,
       title: "Items waiting in your bag!",

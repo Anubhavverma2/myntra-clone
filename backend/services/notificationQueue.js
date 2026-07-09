@@ -1,8 +1,8 @@
 const NotificationJob = require("../models/NotificationJob");
 const DeviceToken = require("../models/DeviceToken");
 
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_NOTIFICATIONS_PER_USER_PER_MINUTE = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const MAX_NOTIFICATIONS_PER_USER_PER_WINDOW = 5;
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
 async function isRateLimited(userId) {
@@ -12,7 +12,7 @@ async function isRateLimited(userId) {
     status: "sent",
     sentAt: { $gte: since },
   });
-  return sentCount >= MAX_NOTIFICATIONS_PER_USER_PER_MINUTE;
+  return sentCount >= MAX_NOTIFICATIONS_PER_USER_PER_WINDOW;
 }
 
 function isInvalidExpoTokenError(error) {
@@ -67,7 +67,7 @@ async function sendPushToUser(userId, title, body, data = {}) {
   }
 
   if (invalidTokens.length > 0) {
-    await DeviceToken.updateMany({ token: { $in: invalidTokens } }, { isValid: false });
+    await DeviceToken.deleteMany({ token: { $in: invalidTokens } });
   }
 
   return { sent };
