@@ -33,7 +33,11 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("✅ Myntra backend is working");
+  res.json({
+    success: true,
+    message: "Myntra Backend Live",
+    time: new Date()
+  });
 });
 
 app.use("/user", userrouter);
