@@ -50,14 +50,14 @@ export default function ProductDetails() {
         setIsLoading(true);
         const res = await api.get(`/product/${id}`);
         setProduct(res.data);
-        if (res.data.sizes?.length === 1) setSelectedSize(res.data.sizes[0]);
+        if (res.data.sizes?.length > 0) setSelectedSize(res.data.sizes[0]);
         await trackProductView(id, user?._id);
       } catch (error) {
         console.log(error);
         const demoProduct = DEMO_PRODUCTS.find((item) => item._id === id);
         if (demoProduct) {
           setProduct(demoProduct);
-          if (demoProduct.sizes?.length === 1) setSelectedSize(demoProduct.sizes[0]);
+          if (demoProduct.sizes?.length > 0) setSelectedSize(demoProduct.sizes[0]);
         }
       } finally {
         setIsLoading(false);
@@ -101,12 +101,14 @@ export default function ProductDetails() {
       router.push("/login");
       return;
     }
-    if (!selectedSize) {
+    const sizeToAdd = selectedSize || product?.sizes?.[0] || "Free Size";
+    if (!sizeToAdd) {
       Alert.alert("Select Size", "Please select a size before adding to bag.");
       return;
     }
+    setSelectedSize(sizeToAdd);
     setLoading(true);
-    addToBag(product || id!, selectedSize, 1).then((ok) => {
+    addToBag(product || id!, sizeToAdd, 1).then((ok) => {
       setLoading(false);
       if (ok) {
         setShowBagShortcut(true);
@@ -215,6 +217,9 @@ export default function ProductDetails() {
         <TouchableOpacity style={styles.wishlistBtn} onPress={handleWishlist}>
           <Heart size={22} color={inWishlist ? colors.primary : colors.text} fill={inWishlist ? colors.primary : "none"} />
         </TouchableOpacity>
+        <TouchableOpacity style={styles.goBagBtn} onPress={() => router.push("/bag")}>
+          <Text style={styles.goBagBtnText}>GO TO BAG</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addBtn} onPress={handleAddToBag} disabled={loading}>
           {loading ? (
             <ActivityIndicator color={colors.onPrimary} />
@@ -304,6 +309,18 @@ const createStyles = (colors: any) =>
       alignItems: "center",
       justifyContent: "center",
     },
+    goBagBtn: {
+      minWidth: 96,
+      height: 52,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      backgroundColor: colors.surface,
+    },
+    goBagBtnText: { color: colors.primary, fontSize: 12, fontWeight: "800", letterSpacing: 0.4 },
     addBtn: {
       flex: 1,
       flexDirection: "row",
@@ -314,5 +331,5 @@ const createStyles = (colors: any) =>
       gap: 8,
       height: 52,
     },
-    addBtnText: { color: colors.onPrimary, fontSize: 14, fontWeight: "700", letterSpacing: 0.8 },
+    addBtnText: { color: colors.onPrimary, fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
   });
