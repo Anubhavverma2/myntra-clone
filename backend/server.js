@@ -16,7 +16,7 @@ const Notificationroutes = require("./routes/Notificationroutes");
 const { startNotificationWorker } = require("./services/notificationQueue");
 
 dotenv.config();
-
+console.log("🔥 SERVER VERSION: JULY-10-TEST");
 
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
