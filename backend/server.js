@@ -17,6 +17,12 @@ const { startNotificationWorker } = require("./services/notificationQueue");
 
 dotenv.config();
 
+
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+console.log("DNS:", dns.getServers());
+
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: "*" }));
