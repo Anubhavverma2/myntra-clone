@@ -14,20 +14,25 @@ import { Heart, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react-na
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useWishlist } from "@/context/WishlistContext";
+import { useBag } from "@/context/BagContext";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
 import { addLocalBagItem, getLocalWishlist, removeLocalWishlistItem } from "@/utils/storage";
+import ProductCard from "@/components/ProductCard";
+import { getPopularDemoProducts, getWishlistDemoRecommendations, mergeUniqueProducts } from "@/constants/demoProducts";
 
 export default function Wishlist() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useAppTheme();
   const { refreshWishlist } = useWishlist();
+  const { refreshBag } = useBag();
   const { requireAuth } = useRequireAuth();
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -37,12 +42,27 @@ export default function Wishlist() {
       const localItems = await getLocalWishlist();
       if (!user) {
         setWishlist(localItems);
+        setRecommendations(
+          localItems.length > 0
+            ? getWishlistDemoRecommendations(localItems, 10)
+            : getPopularDemoProducts(10)
+        );
         await refreshWishlist();
         return;
       }
 
       const res = await api.get(`/wishlist/${user._id}`);
-      setWishlist([...res.data, ...localItems]);
+      const mergedWishlist = [...res.data, ...localItems];
+      setWishlist(mergedWishlist);
+      try {
+        const recs = await api.get(`/recommendations/${user._id}?limit=10`);
+        const demoRecs = getWishlistDemoRecommendations(mergedWishlist, 10);
+        setRecommendations(
+          mergeUniqueProducts(recs.data.products || [], demoRecs, 10)
+        );
+      } catch (error) {
+        setRecommendations(getWishlistDemoRecommendations(mergedWishlist, 10));
+      }
       await refreshWishlist();
     } catch (error) {
       console.log(error);
@@ -115,45 +135,41 @@ export default function Wishlist() {
     ]);
   };
 
-  const handleMoveToBag = (item: any) => {
+  const handleMoveToBag = async (item: any) => {
     const defaultSize = item.productId?.sizes?.[0] || "Free Size";
     if (item._id?.startsWith("local-wishlist-")) {
-      Alert.alert("Move to Bag", `Add "${item.productId.name}" to bag?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Add to Bag",
-          onPress: async () => {
-            await addLocalBagItem(item.productId, defaultSize, 1);
-            await removeLocalWishlistItem(item._id);
-            fetchWishlist();
-            router.push("/bag");
-          },
-        },
+      await addLocalBagItem(item.productId, defaultSize, 1);
+      await removeLocalWishlistItem(item._id);
+      await refreshWishlist();
+      await refreshBag();
+      await fetchWishlist();
+      Alert.alert("Added to Bag", "Product added to your bag.", [
+        { text: "Keep Shopping", style: "cancel" },
+        { text: "Go to Bag", onPress: () => router.push("/bag") },
       ]);
       return;
     }
 
     requireAuth("move items to bag", () => {
-      Alert.alert("Move to Bag", `Add "${item.productId.name}" to bag?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Add to Bag",
-          onPress: async () => {
-            try {
-              await api.post("/wishlist/move-to-bag", {
-                userId: user!._id,
-                wishlistItemId: item._id,
-                size: defaultSize,
-                quantity: 1,
-              });
-              fetchWishlist();
-              router.push("/bag");
-            } catch (error: any) {
-              Alert.alert("Error", error.response?.data?.message || "Could not move to bag");
-            }
-          },
-        },
-      ]);
+      (async () => {
+        try {
+          await api.post("/wishlist/move-to-bag", {
+            userId: user!._id,
+            wishlistItemId: item._id,
+            size: defaultSize,
+            quantity: 1,
+          });
+          await refreshWishlist();
+          await refreshBag();
+          await fetchWishlist();
+          Alert.alert("Added to Bag", "Product added to your bag.", [
+            { text: "Keep Shopping", style: "cancel" },
+            { text: "Go to Bag", onPress: () => router.push("/bag") },
+          ]);
+        } catch (error: any) {
+          Alert.alert("Error", error.response?.data?.message || "Could not move to bag");
+        }
+      })();
     });
   };
 
@@ -163,13 +179,23 @@ export default function Wishlist() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Wishlist</Text>
         </View>
-        <View style={styles.emptyState}>
-          <Heart size={64} color={colors.primary} />
-          <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/login")}>
-            <Text style={styles.primaryButtonText}>LOGIN</Text>
-          </TouchableOpacity>
-        </View>
+        <ScrollView style={styles.content}>
+          <View style={styles.emptyState}>
+            <Heart size={64} color={colors.primary} />
+            <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => router.push("/login")}>
+              <Text style={styles.primaryButtonText}>LOGIN</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.recommendationSection}>
+            <Text style={styles.recommendationTitle}>POPULAR PRODUCTS</Text>
+            <View style={styles.recommendationGrid}>
+              {getPopularDemoProducts(10).map((product) => (
+                <ProductCard key={product._id} product={product} colors={colors} width="48%" />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -272,6 +298,19 @@ export default function Wishlist() {
             );
           })
         )}
+
+        {recommendations.length > 0 && (
+          <View style={styles.recommendationSection}>
+            <Text style={styles.recommendationTitle}>
+              {wishlist.length > 0 ? "MORE LIKE YOUR WISHLIST" : "POPULAR PRODUCTS"}
+            </Text>
+            <View style={styles.recommendationGrid}>
+              {recommendations.map((product) => (
+                <ProductCard key={product._id} product={product} colors={colors} width="48%" />
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -336,4 +375,17 @@ const createStyles = (colors: any) =>
     discount: { fontSize: 13, color: colors.primary },
     actions: { justifyContent: "center", paddingRight: 10, gap: 8 },
     iconBtn: { padding: 8 },
+    recommendationSection: { marginTop: 18, paddingBottom: 20 },
+    recommendationTitle: {
+      fontSize: 15,
+      fontWeight: "bold",
+      color: colors.text,
+      marginBottom: 12,
+      letterSpacing: 0.5,
+    },
+    recommendationGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+    },
   });

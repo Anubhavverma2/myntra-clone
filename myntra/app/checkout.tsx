@@ -1,9 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { useAppTheme } from "@/context/ThemeContext";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { api } from "@/utils/api";
-import { getLocalBagItems, saveLocalBagItems } from "@/utils/storage";
 import { useRouter } from "expo-router";
 import { CreditCard, MapPin, Truck } from "lucide-react-native";
 import {
@@ -16,53 +11,76 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useAuth } from "@/context/AuthContext";
+import { useAppTheme } from "@/context/ThemeContext";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { api } from "@/utils/api";
+import { getLocalBagItems, saveLocalBagItems } from "@/utils/storage";
 
 export default function Checkout() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { colors } = useAppTheme();
+  const { requireAuth } = useRequireAuth();
   const [loading, setLoading] = useState(false);
   const [bagTotal, setBagTotal] = useState(0);
   const [serverTotal, setServerTotal] = useState(0);
   const [localTotal, setLocalTotal] = useState(0);
   const [address, setAddress] = useState("123 Main Street, Mumbai, Maharashtra 400001");
-  const router = useRouter();
-  const { user } = useAuth();
-  const { colors } = useAppTheme();
-  const { requireAuth } = useRequireAuth();
+
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  useEffect(() => {
+  const loadTotals = async () => {
     if (!user) return;
-    const loadTotals = async () => {
-      try {
-        const [bagRes, localItems] = await Promise.all([
-          api.get(`/bag/${user._id}`),
-          getLocalBagItems(),
-        ]);
-        const nextServerTotal = bagRes.data.total || 0;
-        const nextLocalTotal = localItems.reduce(
-          (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
-          0
-        );
-        setServerTotal(nextServerTotal);
-        setLocalTotal(nextLocalTotal);
-        setBagTotal(nextServerTotal + nextLocalTotal);
-      } catch (error) {
-        console.log(error);
-        const localItems = await getLocalBagItems();
-        const nextLocalTotal = localItems.reduce(
-          (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
-          0
-        );
-        setServerTotal(0);
-        setLocalTotal(nextLocalTotal);
-        setBagTotal(nextLocalTotal);
-      }
-    };
+    try {
+      const [bagRes, localItems] = await Promise.all([
+        api.get(`/bag/${user._id}`),
+        getLocalBagItems(),
+      ]);
+      const nextServerTotal = bagRes.data.total || 0;
+      const nextLocalTotal = localItems.reduce(
+        (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+        0
+      );
+      setServerTotal(nextServerTotal);
+      setLocalTotal(nextLocalTotal);
+      setBagTotal(nextServerTotal + nextLocalTotal);
+    } catch (error) {
+      console.log(error);
+      const localItems = await getLocalBagItems();
+      const nextLocalTotal = localItems.reduce(
+        (sum, item) => sum + (Number(item.productId?.price) || 0) * item.quantity,
+        0
+      );
+      setServerTotal(0);
+      setLocalTotal(nextLocalTotal);
+      setBagTotal(nextLocalTotal);
+    }
+  };
+
+  useEffect(() => {
     loadTotals();
   }, [user]);
 
   const shipping = bagTotal > 0 ? 99 : 0;
   const tax = Math.round(bagTotal * 0.05);
   const grandTotal = bagTotal + shipping + tax;
+
+  const createLocalTransaction = async () => {
+    if (!user || localTotal <= 0) return;
+    const txnRes = await api.post("/transactions", {
+      userId: user._id,
+      paymentMode: "UPI",
+      amount: localTotal,
+    });
+    await api.post("/transactions/webhook", {
+      webhookId: `demo-${txnRes.data._id}`,
+      transactionId: txnRes.data._id,
+      status: "success",
+      amount: localTotal,
+    });
+    await saveLocalBagItems([]);
+  };
 
   const handlePlaceOrder = () => {
     requireAuth("place an order", async () => {
@@ -77,6 +95,7 @@ export default function Checkout() {
           const validation = await api.post(`/bag/validate-checkout/${user!._id}`);
           if (!validation.data.valid) {
             Alert.alert("Checkout Issue", validation.data.issues.map((i: any) => i.message).join("\n"));
+            await loadTotals();
             return;
           }
           await api.post(`/order/create/${user!._id}`, {
@@ -85,20 +104,7 @@ export default function Checkout() {
           });
         }
 
-        if (localTotal > 0) {
-          const txnRes = await api.post("/transactions", {
-            userId: user!._id,
-            paymentMode: "UPI",
-            amount: localTotal,
-          });
-          await api.post("/transactions/webhook", {
-            webhookId: `demo-${txnRes.data._id}`,
-            transactionId: txnRes.data._id,
-            status: "success",
-            amount: localTotal,
-          });
-          await saveLocalBagItems([]);
-        }
+        await createLocalTransaction();
 
         await api.post("/notifications/send", {
           userId: user!._id,
@@ -110,7 +116,7 @@ export default function Checkout() {
         setServerTotal(0);
         setLocalTotal(0);
         setBagTotal(0);
-        Alert.alert("Order Placed 🎉", "Your order has been confirmed.", [
+        Alert.alert("Order Placed", "Your order has been confirmed.", [
           { text: "View Transactions", onPress: () => router.push("/transactions") },
           { text: "OK", style: "cancel" },
         ]);

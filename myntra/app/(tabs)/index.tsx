@@ -17,17 +17,11 @@ import { api } from "@/utils/api";
 import { getRecentlyViewed } from "@/utils/recentlyViewed";
 import ProductCard from "@/components/ProductCard";
 import { DEFAULT_CATEGORIES, isRealCategoryId, normalizeCategories } from "@/constants/categories";
+import { DEMO_PRODUCTS, getPopularDemoProducts, mergeUniqueProducts } from "@/constants/demoProducts";
 
 const deals = [
   { id: 1, title: "Under ₹599", image: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500&auto=format&fit=crop" },
   { id: 2, title: "40-70% Off", image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=500&auto=format&fit=crop" },
-];
-
-const fallbackProducts = [
-  { _id: "prod1", name: "Premium Cotton T-Shirt", brand: "Roadster", price: 799, discount: "60% OFF", images: ["https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&auto=format&fit=crop"] },
-  { _id: "prod2", name: "Denim Jacket", brand: "Levis", price: 2499, discount: "40% OFF", images: ["https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=500&auto=format&fit=crop"] },
-  { _id: "prod3", name: "Summer Dress", brand: "ONLY", price: 1299, discount: "50% OFF", images: ["https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=500&auto=format&fit=crop"] },
-  { _id: "prod4", name: "Classic Sneakers", brand: "Nike", price: 3499, discount: "30% OFF", images: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&auto=format&fit=crop"] },
 ];
 
 export default function Home() {
@@ -63,7 +57,7 @@ export default function Home() {
           return found ? { productId: found, viewedAt: item.viewedAt } : item;
         });
         setRecentlyViewed(mergedRecent);
-        setRecommendations(recs.data.products || []);
+        setRecommendations(mergeUniqueProducts(recs.data.products || [], getPopularDemoProducts(8), 8));
       } catch (error) {
         console.log(error);
       } finally {
@@ -74,7 +68,7 @@ export default function Home() {
   }, [user?._id]);
 
   const categoriesToShow = categories.length > 0 ? categories : DEFAULT_CATEGORIES;
-  const productsToShow = products.length > 0 ? products : fallbackProducts;
+  const productsToShow = products.length > 0 ? mergeUniqueProducts(products, DEMO_PRODUCTS) : DEMO_PRODUCTS;
 
   const handleProductPress = (productId: string) => {
     router.push(`/product/${productId}`);

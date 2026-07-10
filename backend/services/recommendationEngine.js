@@ -4,6 +4,10 @@ const Wishlist = require("../models/Wishlist");
 
 const HISTORY_LIMIT = 50;
 const TARGET_QUERY_MS = 200;
+const RELATED_CATEGORY_TERMS = {
+  shoes: ["shoe", "sneaker", "running", "trainer", "footwear"],
+  clothing: ["shirt", "t-shirt", "jeans", "jacket", "dress", "wear"],
+};
 
 async function recordBrowsingHistory(userId, product) {
   if (!userId || !product) return;
@@ -29,6 +33,19 @@ async function recordBrowsingHistory(userId, product) {
   }
 }
 
+function productText(product) {
+  return `${product.name || ""} ${product.brand || ""} ${product.category || ""}`.toLowerCase();
+}
+
+function productTerms(product) {
+  const text = productText(product);
+  const terms = new Set();
+  for (const [term, aliases] of Object.entries(RELATED_CATEGORY_TERMS)) {
+    if (aliases.some((alias) => text.includes(alias))) terms.add(term);
+  }
+  return terms;
+}
+
 function scoreProduct(product, context) {
   const productId = product._id.toString();
   let score = 0;
@@ -38,6 +55,10 @@ function scoreProduct(product, context) {
   if (context.categories.has(product.category)) score += 6;
   if (context.wishlistCategories.has(product.category)) score += 4;
   if (context.wishlistIds.has(productId)) score += 8;
+  const terms = productTerms(product);
+  for (const term of terms) {
+    if (context.preferredTerms.has(term)) score += 7;
+  }
 
   return score;
 }
@@ -51,7 +72,7 @@ async function getRecommendations(userId, limit = 8) {
       ? BrowsingHistory.find({ userId }).sort({ viewedAt: -1 }).limit(HISTORY_LIMIT).lean()
       : [],
     userId
-      ? Wishlist.find({ userId }).populate("productId", "category").select("productId").lean()
+      ? Wishlist.find({ userId }).populate("productId", "name brand category").select("productId").lean()
       : [],
     Product.find({ isActive: true })
       .sort({ viewCount: -1, purchaseCount: -1 })
@@ -67,14 +88,27 @@ async function getRecommendations(userId, limit = 8) {
   const wishlistCategories = new Set(
     wishlistItems.map((w) => w.productId?.category).filter(Boolean)
   );
+  const preferredTerms = new Set();
+  [...history, ...wishlistItems.map((w) => w.productId).filter(Boolean)].forEach((item) => {
+    const productLike = item.productId ? item : item;
+    productTerms(productLike).forEach((term) => preferredTerms.add(term));
+  });
   const preferredCategories = [...new Set([...categories, ...wishlistCategories])];
   const excludeIds = [...new Set([...historyProductIds])];
 
   let candidates = [];
-  if (preferredCategories.length > 0) {
+  if (preferredCategories.length > 0 || preferredTerms.size > 0) {
+    const termRegexes = [...preferredTerms].flatMap((term) =>
+      RELATED_CATEGORY_TERMS[term].map((alias) => new RegExp(alias, "i"))
+    );
+    const similarityFilters = [];
+    if (preferredCategories.length > 0) similarityFilters.push({ category: { $in: preferredCategories } });
+    if (termRegexes.length > 0) {
+      similarityFilters.push({ name: { $in: termRegexes } }, { category: { $in: termRegexes } });
+    }
     candidates = await Product.find({
       isActive: true,
-      category: { $in: preferredCategories },
+      ...(similarityFilters.length > 0 ? { $or: similarityFilters } : {}),
       _id: { $nin: excludeIds },
     })
       .sort({ purchaseCount: -1, viewCount: -1 })
@@ -86,7 +120,7 @@ async function getRecommendations(userId, limit = 8) {
   const fallback = popular.filter((p) => !existingIds.has(p._id.toString()));
   const allCandidates = [...candidates, ...fallback];
 
-  const context = { categories, wishlistCategories, wishlistIds };
+  const context = { categories, wishlistCategories, wishlistIds, preferredTerms };
   const products = allCandidates
     .map((product) => ({ product, score: scoreProduct(product, context) }))
     .sort((a, b) => b.score - a.score)
@@ -101,7 +135,7 @@ async function getRecommendations(userId, limit = 8) {
       queryTimeMs,
       targetMs: TARGET_QUERY_MS,
       withinTarget: queryTimeMs <= TARGET_QUERY_MS,
-      strategy: preferredCategories.length > 0 ? "personalized-batched" : "cold-start-popularity",
+      strategy: preferredCategories.length > 0 || preferredTerms.size > 0 ? "personalized-batched" : "cold-start-popularity",
       complexity: "O(h + w + c log c), with h<=50 and c bounded by limit",
     },
   };

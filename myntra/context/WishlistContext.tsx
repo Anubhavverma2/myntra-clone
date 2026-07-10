@@ -51,6 +51,13 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     refreshWishlist();
   }, [refreshWishlist]);
 
+  useEffect(() => {
+    if (!user?._id) {
+      setWishlistIds(new Set());
+      setLoading(false);
+    }
+  }, [user?._id]);
+
   const isInWishlist = useCallback(
     (productId: string) => wishlistIds.has(productId),
     [wishlistIds]

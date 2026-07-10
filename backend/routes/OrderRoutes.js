@@ -46,8 +46,18 @@ router.post("/create/:userId", async (req, res) => {
 
     const issues = [];
     for (const item of bag) {
-      if (!item.productId?.isActive) issues.push(`${item.productId?.name || "Item"} discontinued`);
-      else if (item.productId.stock < item.quantity) issues.push(`${item.productId.name} out of stock`);
+      if (!item.productId?.isActive || item.productId?.isDiscontinued) {
+        issues.push(`${item.productId?.name || "Item"} is no longer available`);
+      } else if (item.productId.stock <= 0) {
+        issues.push(`${item.productId.name} is out of stock`);
+      } else if (item.productId.stock < item.quantity) {
+        issues.push(`Only ${item.productId.stock} ${item.productId.name} available`);
+      } else if (item.priceAtAdd !== item.productId.price) {
+        item.priceAtAdd = item.productId.price;
+        item.version += 1;
+        await item.save({ session });
+        issues.push(`${item.productId.name} price changed. Please review your bag.`);
+      }
     }
     if (issues.length > 0) {
       await session.abortTransaction();
@@ -101,11 +111,20 @@ router.post("/create/:userId", async (req, res) => {
     );
 
     for (const item of bag) {
-      await Product.findByIdAndUpdate(
-        item.productId._id,
+      const stockUpdate = await Product.updateOne(
+        {
+          _id: item.productId._id,
+          stock: { $gte: item.quantity },
+          isActive: true,
+          isDiscontinued: { $ne: true },
+        },
         { $inc: { stock: -item.quantity, purchaseCount: item.quantity } },
         { session }
       );
+      if (stockUpdate.modifiedCount !== 1) {
+        await session.abortTransaction();
+        return res.status(409).json({ message: "Stock changed while placing order. Please review your bag." });
+      }
     }
 
     await Bag.deleteMany({ userId: userid, section: "active" }, { session });

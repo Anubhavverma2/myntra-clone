@@ -67,6 +67,11 @@ export const RECENTLY_VIEWED_KEY = "myntra_recently_viewed_local";
 export const LOCAL_WISHLIST_KEY = "myntra_local_wishlist";
 export const LOCAL_BAG_KEY = "myntra_local_bag";
 
+export const clearLocalShoppingData = async () => {
+  await deleteItemAsync(LOCAL_WISHLIST_KEY);
+  await deleteItemAsync(LOCAL_BAG_KEY);
+};
+
 export type LocalRecentlyViewed = {
   productId: string;
   viewedAt: string;

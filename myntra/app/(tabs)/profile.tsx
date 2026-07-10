@@ -31,8 +31,8 @@ export default function Profile() {
   const { user, logout } = useAuth();
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout();
     router.replace("/");
   };
 

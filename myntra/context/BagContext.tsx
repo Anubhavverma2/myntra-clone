@@ -57,6 +57,14 @@ export function BagProvider({ children }: { children: React.ReactNode }) {
     refreshBag();
   }, [refreshBag]);
 
+  useEffect(() => {
+    if (!user?._id) {
+      setBagCount(0);
+      setBagTotal(0);
+      setLoading(false);
+    }
+  }, [user?._id]);
+
   const addToBag = useCallback(
     async (product: string | LocalProductSnapshot, size?: string, quantity = 1) => {
       const productId = typeof product === "string" ? product : product._id;

@@ -15,6 +15,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { api, BASE_URL } from "@/utils/api";
 
+const statusOptions = ["", "success", "pending", "failed", "refunded"];
+const paymentModes = ["", "UPI", "Card", "Net Banking", "COD", "Wallet"];
+const sortOptions = [
+  { label: "Newest First", sortBy: "createdAt", sortOrder: "desc" },
+  { label: "Oldest First", sortBy: "createdAt", sortOrder: "asc" },
+  { label: "Highest Amount", sortBy: "amount", sortOrder: "desc" },
+];
+
 export default function Transactions() {
   const router = useRouter();
   const { user } = useAuth();
@@ -24,6 +32,10 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [paymentModeFilter, setPaymentModeFilter] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [pageSize, setPageSize] = useState(20);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -31,11 +43,17 @@ export default function Transactions() {
     if (!user) return;
     try {
       setLoading(true);
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+        sortBy,
+        sortOrder,
+      });
       if (statusFilter) params.append("status", statusFilter);
+      if (paymentModeFilter) params.append("paymentMode", paymentModeFilter);
       const res = await api.get(`/transactions/user/${user._id}?${params}`);
-      setTransactions(res.data.transactions);
-      setTotalPages(res.data.pagination.totalPages);
+      setTransactions(res.data.transactions || []);
+      setTotalPages(res.data.pagination?.totalPages || 1);
     } catch (error) {
       console.log(error);
     } finally {
@@ -45,16 +63,21 @@ export default function Transactions() {
 
   useEffect(() => {
     fetchTransactions();
-  }, [user, page, statusFilter]);
+  }, [user, page, pageSize, statusFilter, paymentModeFilter, sortBy, sortOrder]);
 
-  const downloadReceipt = (txnId: string, invoiceId: string) => {
-    const url = `${BASE_URL}/transactions/receipt/${txnId}`;
-    Linking.openURL(url).catch(() => Alert.alert("Error", "Could not download receipt"));
+  const downloadReceipt = (txnId: string) => {
+    Linking.openURL(`${BASE_URL}/transactions/receipt/${txnId}`).catch(() =>
+      Alert.alert("Error", "Could not download receipt")
+    );
   };
 
   const exportCsv = () => {
     if (!user) return;
-    Linking.openURL(`${BASE_URL}/transactions/export/${user._id}/csv`);
+    const params = new URLSearchParams();
+    if (statusFilter) params.append("status", statusFilter);
+    if (paymentModeFilter) params.append("paymentMode", paymentModeFilter);
+    const suffix = params.toString() ? `?${params}` : "";
+    Linking.openURL(`${BASE_URL}/transactions/export/${user._id}/csv${suffix}`);
   };
 
   if (!user) {
@@ -74,20 +97,68 @@ export default function Transactions() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><ChevronLeft size={24} color={colors.text} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}>
+          <ChevronLeft size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Transactions</Text>
-        <TouchableOpacity onPress={exportCsv}><Download size={22} color={colors.primary} /></TouchableOpacity>
+        <TouchableOpacity onPress={exportCsv}>
+          <Download size={22} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>
-        {["", "success", "pending", "failed", "refunded"].map((s) => (
+        {statusOptions.map((status) => (
           <TouchableOpacity
-            key={s || "all"}
-            style={[styles.filterChip, statusFilter === s && styles.filterChipActive]}
-            onPress={() => { setStatusFilter(s); setPage(1); }}
+            key={status || "all-status"}
+            style={[styles.filterChip, statusFilter === status && styles.filterChipActive]}
+            onPress={() => { setStatusFilter(status); setPage(1); }}
           >
-            <Text style={[styles.filterText, statusFilter === s && styles.filterTextActive]}>
-              {s || "All"}
+            <Text style={[styles.filterText, statusFilter === status && styles.filterTextActive]}>
+              {status || "All Status"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>
+        {paymentModes.map((mode) => (
+          <TouchableOpacity
+            key={mode || "all-modes"}
+            style={[styles.filterChip, paymentModeFilter === mode && styles.filterChipActive]}
+            onPress={() => { setPaymentModeFilter(mode); setPage(1); }}
+          >
+            <Text style={[styles.filterText, paymentModeFilter === mode && styles.filterTextActive]}>
+              {mode || "All Modes"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filters}>
+        {sortOptions.map((option) => {
+          const active = sortBy === option.sortBy && sortOrder === option.sortOrder;
+          return (
+            <TouchableOpacity
+              key={option.label}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => {
+                setSortBy(option.sortBy);
+                setSortOrder(option.sortOrder);
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.filterText, active && styles.filterTextActive]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {[10, 20, 50].map((size) => (
+          <TouchableOpacity
+            key={size}
+            style={[styles.filterChip, pageSize === size && styles.filterChipActive]}
+            onPress={() => { setPageSize(size); setPage(1); }}
+          >
+            <Text style={[styles.filterText, pageSize === size && styles.filterTextActive]}>
+              {size}/page
             </Text>
           </TouchableOpacity>
         ))}
@@ -106,13 +177,13 @@ export default function Transactions() {
                 <Text style={styles.invoice}>{txn.invoiceId}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: txn.status === "success" ? colors.successBg : colors.primaryLight }]}>
                   <Text style={[styles.statusText, { color: txn.status === "success" ? colors.success : colors.primary }]}>
-                    {txn.status.toUpperCase()}
+                    {txn.status?.toUpperCase()}
                   </Text>
                 </View>
               </View>
               <Text style={styles.amount}>₹{txn.amount}</Text>
               <Text style={styles.meta}>{txn.paymentMode} • {new Date(txn.createdAt).toLocaleString()}</Text>
-              <TouchableOpacity style={styles.receiptBtn} onPress={() => downloadReceipt(txn._id, txn.invoiceId)}>
+              <TouchableOpacity style={styles.receiptBtn} onPress={() => downloadReceipt(txn._id)}>
                 <Download size={16} color={colors.primary} />
                 <Text style={styles.receiptText}>Download Receipt</Text>
               </TouchableOpacity>
@@ -148,7 +219,7 @@ const createStyles = (colors: any) =>
       borderBottomColor: colors.border,
     },
     headerTitle: { fontSize: 20, fontWeight: "bold", color: colors.text },
-    filters: { paddingHorizontal: 15, paddingVertical: 10, maxHeight: 50 },
+    filters: { paddingHorizontal: 15, paddingVertical: 8, maxHeight: 46 },
     filterChip: {
       paddingHorizontal: 14,
       paddingVertical: 6,
@@ -159,7 +230,7 @@ const createStyles = (colors: any) =>
     },
     filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     filterText: { fontSize: 13, color: colors.text, textTransform: "capitalize" },
-    filterTextActive: { color: "#fff" },
+    filterTextActive: { color: colors.onPrimary },
     list: { flex: 1, padding: 15 },
     card: {
       backgroundColor: colors.card,
@@ -184,5 +255,5 @@ const createStyles = (colors: any) =>
     center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
     emptyText: { color: colors.textSecondary, fontSize: 16 },
     primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 4, marginTop: 16 },
-    primaryBtnText: { color: "#fff", fontWeight: "bold" },
+    primaryBtnText: { color: colors.onPrimary, fontWeight: "bold" },
   });

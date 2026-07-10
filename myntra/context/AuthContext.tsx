@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { getUserData, saveUserData, clearUserData } from "@/utils/storage";
+import { getUserData, saveUserData, clearUserData, clearLocalShoppingData } from "@/utils/storage";
 import { mergeRecentlyViewedOnLogin } from "@/utils/recentlyViewed";
 import { registerForPushNotifications } from "@/utils/notifications";
 import React from "react";
@@ -84,6 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     await clearUserData();
+    await clearLocalShoppingData();
     setUser(null);
     setIsAuthenticated(false);
   };

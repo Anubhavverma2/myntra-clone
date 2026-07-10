@@ -19,6 +19,7 @@ import { useBag } from "@/context/BagContext";
 import { api } from "@/utils/api";
 import { trackProductView } from "@/utils/recentlyViewed";
 import ProductCard from "@/components/ProductCard";
+import { DEMO_PRODUCTS, getWishlistDemoRecommendations } from "@/constants/demoProducts";
 
 export default function ProductDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,6 +36,7 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [showBagShortcut, setShowBagShortcut] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -42,6 +44,7 @@ export default function ProductDetails() {
 
   useEffect(() => {
     if (!id) return;
+    setShowBagShortcut(false);
     const fetchProduct = async () => {
       try {
         setIsLoading(true);
@@ -51,6 +54,11 @@ export default function ProductDetails() {
         await trackProductView(id, user?._id);
       } catch (error) {
         console.log(error);
+        const demoProduct = DEMO_PRODUCTS.find((item) => item._id === id);
+        if (demoProduct) {
+          setProduct(demoProduct);
+          if (demoProduct.sizes?.length === 1) setSelectedSize(demoProduct.sizes[0]);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -63,9 +71,18 @@ export default function ProductDetails() {
       try {
         const url = user?._id ? `/recommendations/${user._id}` : "/recommendations";
         const res = await api.get(url);
-        setRecommendations((res.data.products || []).filter((p: any) => p._id !== id).slice(0, 4));
+        const recProducts = (res.data.products || []).filter((p: any) => p._id !== id).slice(0, 4);
+        setRecommendations(
+          recProducts.length
+            ? recProducts
+            : getWishlistDemoRecommendations([{ productId: { _id: id, name: "", category: product?.category } }], 4)
+        );
       } catch (error) {
         console.log(error);
+        const currentProduct = product || DEMO_PRODUCTS.find((item) => item._id === id);
+        setRecommendations(
+          getWishlistDemoRecommendations(currentProduct ? [{ productId: currentProduct }] : [], 4)
+        );
       }
     };
     fetchRecs();
@@ -76,7 +93,7 @@ export default function ProductDetails() {
       router.push("/login");
       return;
     }
-    toggleWishlist(id!);
+    toggleWishlist(product || id!);
   };
 
   const handleAddToBag = () => {
@@ -89,9 +106,10 @@ export default function ProductDetails() {
       return;
     }
     setLoading(true);
-    addToBag(id!, selectedSize, 1).then((ok) => {
+    addToBag(product || id!, selectedSize, 1).then((ok) => {
       setLoading(false);
       if (ok) {
+        setShowBagShortcut(true);
         Alert.alert("Added to Bag", "Item added successfully.", [
           { text: "Continue Shopping", style: "cancel" },
           { text: "Go to Bag", onPress: () => router.push("/bag") },
@@ -129,6 +147,13 @@ export default function ProductDetails() {
           <Heart size={24} color={inWishlist ? colors.primary : colors.text} fill={inWishlist ? colors.primary : "none"} />
         </TouchableOpacity>
       </View>
+
+      {showBagShortcut && (
+        <TouchableOpacity style={styles.bagShortcut} onPress={() => router.push("/bag")}>
+          <ShoppingBag size={18} color={colors.onPrimary} />
+          <Text style={styles.bagShortcutText}>GO TO YOUR BAG</Text>
+        </TouchableOpacity>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.carouselContainer}>
@@ -221,6 +246,17 @@ const createStyles = (colors: any) =>
     },
     backBtn: { padding: 8 },
     topTitle: { flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: colors.text },
+    bagShortcut: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    bagShortcutText: { color: colors.onPrimary, fontSize: 13, fontWeight: "800", letterSpacing: 0.7 },
     carouselContainer: { position: "relative" },
     productImage: { height: 420, backgroundColor: colors.inputBg },
     pagination: { position: "absolute", bottom: 14, flexDirection: "row", width: "100%", justifyContent: "center" },

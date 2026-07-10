@@ -15,6 +15,7 @@ const ProductSchema = new mongoose.Schema(
     viewCount: { type: Number, default: 0 },
     purchaseCount: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+    isDiscontinued: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
