@@ -33,11 +33,17 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
+  console.log("🔥 ROOT ROUTE HIT");
   res.json({
     success: true,
     message: "Myntra Backend Live",
     time: new Date()
   });
+});
+
+app.get("/health", (req, res) => {
+  console.log("🔥 HEALTH ROUTE HIT");
+  res.json({ ok: true });
 });
 
 app.use("/user", userrouter);
