@@ -27,7 +27,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/myntra-fav.webp"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
