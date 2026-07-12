@@ -23,6 +23,7 @@ import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { api } from "@/utils/api";
+import { getLocalOrders } from "@/utils/storage";
 
 const sampleOrders = [
   {
@@ -147,11 +148,15 @@ export default function Orders() {
       }
       try {
         setIsLoading(true);
-        const response = await api.get(`/order/user/${user._id}`);
-        setOrders(response.data);
+        const [response, localOrders] = await Promise.all([
+          api.get(`/order/user/${user._id}`),
+          getLocalOrders(user._id),
+        ]);
+        setOrders([...(localOrders || []), ...(response.data || [])]);
       } catch (error) {
         console.log(error);
-        setOrders([]);
+        const localOrders = await getLocalOrders(user._id);
+        setOrders(localOrders);
       } finally {
         setIsLoading(false);
       }
@@ -226,7 +231,9 @@ export default function Orders() {
             >
               <View>
                 <Text style={styles.orderId}>Order #{order._id}</Text>
-                <Text style={styles.orderDate}>{order.date}</Text>
+                <Text style={styles.orderDate}>
+                  {order.date ? new Date(order.date).toLocaleString() : ""}
+                </Text>
               </View>
               <View style={styles.statusContainer}>
                 <Package size={16} color="#00b852" />

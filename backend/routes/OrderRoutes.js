@@ -11,7 +11,7 @@ const { enqueueNotification } = require("../services/notificationQueue");
 
 function genrateRandomTracking() {
   const carriers = ["Delhivery", "Bluedart", "Ecom Express", "XpressBees"];
-  const statusOptions = ["Shipped", "Out for Delivery", "Delivered", "In Transit"];
+  const statusOptions = ["Delivered"];
   const locations = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune"];
   const randomcarrier = carriers[Math.floor(Math.random() * carriers.length)];
   const randomstatusOptions = statusOptions[Math.floor(Math.random() * statusOptions.length)];
@@ -77,7 +77,7 @@ router.post("/create/:userId", async (req, res) => {
     const newOrder = new Order({
       userId: userid,
       date: new Date().toISOString(),
-      status: "Processing",
+      status: "Delivered",
       items: orderitem,
       total,
       shippingAddress: req.body.shippingAddress || "",
@@ -132,8 +132,8 @@ router.post("/create/:userId", async (req, res) => {
 
     await enqueueNotification({
       userId: userid,
-      title: "Order Placed Successfully!",
-      body: `Your order of ₹${total} has been confirmed.`,
+      title: "Order Delivered",
+      body: `Your order of ₹${total} has been delivered successfully.`,
       data: { screen: "orders", orderId: savedOrder._id.toString() },
     });
 

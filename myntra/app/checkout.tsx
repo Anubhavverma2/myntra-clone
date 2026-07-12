@@ -15,7 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { api } from "@/utils/api";
-import { getLocalBagItems, saveLocalBagItems } from "@/utils/storage";
+import { getLocalBagItems, saveLocalBagItems, saveLocalOrder } from "@/utils/storage";
 
 export default function Checkout() {
   const router = useRouter();
@@ -68,6 +68,7 @@ export default function Checkout() {
 
   const createLocalTransaction = async () => {
     if (!user || localTotal <= 0) return;
+    const localItems = await getLocalBagItems();
     const txnRes = await api.post("/transactions", {
       userId: user._id,
       paymentMode: "UPI",
@@ -79,6 +80,9 @@ export default function Checkout() {
       status: "success",
       amount: localTotal,
     });
+    if (localItems.length > 0) {
+      await saveLocalOrder(user._id, localItems, grandTotal, address, "UPI");
+    }
     await saveLocalBagItems([]);
   };
 
@@ -109,18 +113,18 @@ export default function Checkout() {
         await api.post("/notifications/send", {
           userId: user!._id,
           title: "Order Placed Successfully!",
-          body: `Your order of ₹${grandTotal} has been confirmed.`,
-          data: { screen: serverTotal > 0 ? "orders" : "transactions" },
+          body: `Your order of ₹${grandTotal} has been delivered successfully.`,
+          data: { screen: "orders" },
         }).catch(console.log);
 
         setServerTotal(0);
         setLocalTotal(0);
         setBagTotal(0);
-        Alert.alert("Order Placed", "Your order has been confirmed.", [
-          { text: "View Transactions", onPress: () => router.push("/transactions") },
+        Alert.alert("Order Delivered", "Your order has been delivered successfully.", [
+          { text: "View Orders", onPress: () => router.push("/orders") },
           { text: "OK", style: "cancel" },
         ]);
-        router.push(serverTotal > 0 ? "/orders" : "/transactions");
+        router.push("/orders");
       } catch (error: any) {
         Alert.alert("Error", error.response?.data?.message || "Order failed");
       } finally {
