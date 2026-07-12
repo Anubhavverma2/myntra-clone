@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Heart, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react-native";
+import { Heart, Trash2, ShoppingBag, CheckSquare, Square, ChevronLeft } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -177,7 +177,11 @@ export default function Wishlist() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <ChevronLeft size={26} color={colors.text} />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Wishlist</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <ScrollView style={styles.content}>
           <View style={styles.emptyState}>
@@ -211,6 +215,9 @@ export default function Wishlist() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ChevronLeft size={26} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Wishlist ({wishlist.length})</Text>
         {wishlist.length > 0 && (
           <TouchableOpacity
@@ -222,6 +229,7 @@ export default function Wishlist() {
             <Text style={styles.linkText}>{selectionMode ? "Done" : "Select"}</Text>
           </TouchableOpacity>
         )}
+        {wishlist.length === 0 && <View style={styles.headerSpacer} />}
       </View>
 
       {selectionMode && wishlist.length > 0 && (
@@ -322,7 +330,6 @@ const createStyles = (colors: any) =>
     container: { flex: 1, backgroundColor: colors.background },
     header: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
       padding: 15,
       paddingTop: 50,
@@ -330,7 +337,9 @@ const createStyles = (colors: any) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    headerTitle: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center", marginRight: 8 },
+    headerTitle: { flex: 1, fontSize: 24, fontWeight: "bold", color: colors.text },
+    headerSpacer: { width: 36 },
     linkText: { color: colors.primary, fontWeight: "600", fontSize: 14 },
     selectionBar: {
       flexDirection: "row",

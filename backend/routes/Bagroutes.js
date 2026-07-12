@@ -5,11 +5,11 @@ const Product = require("../models/Product");
 const router = express.Router();
 
 const isObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-const isUnavailable = (product) => !product || !product.isActive || product.isDiscontinued;
+const isUnavailable = (product) => !product || product.isActive === false || product.isDiscontinued === true;
 
 function productUnavailableMessage(product) {
   if (!product) return "This product is no longer available.";
-  if (product.isDiscontinued || !product.isActive) return `${product.name || "This product"} is no longer available.`;
+  if (product.isDiscontinued === true || product.isActive === false) return `${product.name || "This product"} is no longer available.`;
   return "This product is no longer available.";
 }
 
@@ -194,7 +194,7 @@ router.patch("/:itemid/move", async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { section } = req.body;
+    const { section, version } = req.body;
     if (!["active", "saved"].includes(section)) {
       await session.abortTransaction();
       return res.status(400).json({ message: "Invalid section" });
@@ -204,6 +204,13 @@ router.patch("/:itemid/move", async (req, res) => {
     if (!item) {
       await session.abortTransaction();
       return res.status(404).json({ message: "Item not found" });
+    }
+    if (version != null && item.version !== Number(version)) {
+      await session.abortTransaction();
+      return res.status(409).json({
+        message: "Cart was updated on another device. Please refresh.",
+        currentVersion: item.version,
+      });
     }
 
     const product = await Product.findById(item.productId).session(session);

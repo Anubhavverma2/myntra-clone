@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { ShoppingBag, Minus, Plus, Trash2, Bookmark } from "lucide-react-native";
+import { ShoppingBag, Minus, Plus, Trash2, Bookmark, ChevronLeft } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useAppTheme } from "@/context/ThemeContext";
 import { useBag } from "@/context/BagContext";
@@ -127,7 +127,7 @@ export default function Bag() {
   const moveSection = async (item: any, section: "active" | "saved") => {
     if (isLocalItem(item)) return;
     try {
-      await api.patch(`/bag/${item._id}/move`, { section });
+      await api.patch(`/bag/${item._id}/move`, { section, version: item.version });
       fetchBag();
       await refreshBag();
     } catch (error: any) {
@@ -138,6 +138,15 @@ export default function Bag() {
 
   const itemIssue = (item: any) => {
     if (!item.productId) return "This product is no longer available.";
+    if (isLocalItem(item)) {
+      if (item.productId.isDiscontinued === true || item.productId.isActive === false) {
+        return "This product is no longer available.";
+      }
+      const localStock = Number.isFinite(Number(item.productId.stock)) ? Number(item.productId.stock) : 100;
+      if (localStock <= 0) return "Out of Stock";
+      if (localStock < item.quantity) return `Only ${localStock} items available.`;
+      return "";
+    }
     if (!item.productId.isActive || item.productId.isDiscontinued) return "This product is no longer available.";
     if (item.productId.stock <= 0) return "Out of Stock";
     if (item.productId.stock < item.quantity) return `Only ${item.productId.stock} items available.`;
@@ -147,7 +156,10 @@ export default function Bag() {
   };
 
   const hasBlockingIssue = bagData.active.some((item: any) => {
-    if (isLocalItem(item)) return false;
+    if (isLocalItem(item)) {
+      const localStock = Number.isFinite(Number(item.productId?.stock)) ? Number(item.productId.stock) : 100;
+      return item.productId?.isActive === false || item.productId?.isDiscontinued === true || localStock < item.quantity;
+    }
     if (!item.productId) return true;
     return !item.productId.isActive || item.productId.isDiscontinued || item.productId.stock < item.quantity;
   });
@@ -167,8 +179,11 @@ export default function Bag() {
 
   const renderItem = (item: any, saved = false) => {
     const issue = itemIssue(item);
-    const stockReached = item.productId?.stock != null && item.quantity >= item.productId.stock;
-    const cannotIncrease = !isLocalItem(item) && (!item.productId || !item.productId.isActive || item.productId.isDiscontinued || stockReached);
+    const productStock = Number.isFinite(Number(item.productId?.stock)) ? Number(item.productId.stock) : 100;
+    const stockReached = item.quantity >= productStock;
+    const cannotIncrease = isLocalItem(item)
+      ? item.productId?.isActive === false || item.productId?.isDiscontinued === true || stockReached
+      : !item.productId || !item.productId.isActive || item.productId.isDiscontinued || stockReached;
 
     return (
       <View key={item._id} style={styles.bagItem}>
@@ -224,7 +239,13 @@ export default function Bag() {
   if (!user && bagData.active.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}><Text style={styles.headerTitle}>Shopping Bag</Text></View>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <ChevronLeft size={26} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Shopping Bag</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <View style={styles.emptyState}>
           <ShoppingBag size={64} color={colors.primary} />
           <Text style={styles.emptyTitle}>Your bag is empty</Text>
@@ -247,7 +268,11 @@ export default function Bag() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ChevronLeft size={26} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Shopping Bag ({bagData.summary.totalItems || bagData.active.length})</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content}>
@@ -311,8 +336,18 @@ const createStyles = (colors: any) =>
   StyleSheet.create({
     loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
     container: { flex: 1, backgroundColor: colors.background },
-    header: { padding: 15, paddingTop: 50, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-    headerTitle: { fontSize: 22, fontWeight: "bold", color: colors.text },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 15,
+      paddingTop: 50,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center", marginRight: 8 },
+    headerTitle: { flex: 1, fontSize: 22, fontWeight: "bold", color: colors.text },
+    headerSpacer: { width: 36 },
     content: { flex: 1, padding: 15 },
     emptyState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, marginTop: 60 },
     emptyTitle: { fontSize: 17, color: colors.text, marginTop: 16, marginBottom: 20 },

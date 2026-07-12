@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const products = await Product.find({ isActive: true });
+    const products = await Product.find({ isActive: { $ne: false }, isDiscontinued: { $ne: true } });
     res.status(200).json(products);
   } catch (error) {
     console.log(error);
@@ -22,7 +22,8 @@ router.get("/category/:categoryId", async (req, res) => {
     }
 
     const products = await Product.find({
-      isActive: true,
+      isActive: { $ne: false },
+      isDiscontinued: { $ne: true },
       $or: [{ categoryId: categoryId }, { _id: { $in: category.productId || [] } }],
     });
 

@@ -74,7 +74,7 @@ async function getRecommendations(userId, limit = 8) {
     userId
       ? Wishlist.find({ userId }).populate("productId", "name brand category").select("productId").lean()
       : [],
-    Product.find({ isActive: true })
+    Product.find({ isActive: { $ne: false }, isDiscontinued: { $ne: true } })
       .sort({ viewCount: -1, purchaseCount: -1 })
       .limit(safeLimit * 3)
       .lean(),
@@ -107,7 +107,8 @@ async function getRecommendations(userId, limit = 8) {
       similarityFilters.push({ name: { $in: termRegexes } }, { category: { $in: termRegexes } });
     }
     candidates = await Product.find({
-      isActive: true,
+      isActive: { $ne: false },
+      isDiscontinued: { $ne: true },
       ...(similarityFilters.length > 0 ? { $or: similarityFilters } : {}),
       _id: { $nin: excludeIds },
     })

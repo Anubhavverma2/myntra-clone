@@ -80,10 +80,11 @@ router.post("/move-to-bag", async (req, res) => {
     if (!wishlistItem) return res.status(404).json({ message: "Wishlist item not found" });
 
     const product = wishlistItem.productId;
-    if (!product.isActive) {
+    if (product.isActive === false || product.isDiscontinued === true) {
       return res.status(400).json({ message: "Product is discontinued" });
     }
-    if (product.stock < quantity) {
+    const availableStock = Number.isFinite(Number(product.stock)) ? Number(product.stock) : 100;
+    if (availableStock < quantity) {
       return res.status(400).json({ message: "Insufficient stock" });
     }
 

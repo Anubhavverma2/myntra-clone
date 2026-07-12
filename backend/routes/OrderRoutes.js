@@ -46,7 +46,7 @@ router.post("/create/:userId", async (req, res) => {
 
     const issues = [];
     for (const item of bag) {
-      if (!item.productId?.isActive || item.productId?.isDiscontinued) {
+      if (item.productId?.isActive === false || item.productId?.isDiscontinued === true) {
         issues.push(`${item.productId?.name || "Item"} is no longer available`);
       } else if (item.productId.stock <= 0) {
         issues.push(`${item.productId.name} is out of stock`);
@@ -115,7 +115,7 @@ router.post("/create/:userId", async (req, res) => {
         {
           _id: item.productId._id,
           stock: { $gte: item.quantity },
-          isActive: true,
+          isActive: { $ne: false },
           isDiscontinued: { $ne: true },
         },
         { $inc: { stock: -item.quantity, purchaseCount: item.quantity } },

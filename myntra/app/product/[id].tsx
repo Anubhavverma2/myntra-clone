@@ -41,6 +41,7 @@ export default function ProductDetails() {
 
   const styles = useMemo(() => createStyles(colors), [colors]);
   const inWishlist = id ? isInWishlist(id) : false;
+  const availableStock = Number.isFinite(Number(product?.stock)) ? Number(product.stock) : 100;
 
   useEffect(() => {
     if (!id) return;
@@ -186,6 +187,13 @@ export default function ProductDetails() {
             {product.discount ? <Text style={styles.discount}>{product.discount}</Text> : null}
           </View>
           <Text style={styles.description}>{product.description}</Text>
+          <Text style={styles.stockText}>
+            {product.isActive === false || product.isDiscontinued === true
+              ? "Product no longer available"
+              : availableStock > 0
+                ? `Available Qty: ${availableStock}`
+                : "Out of Stock"}
+          </Text>
 
           <Text style={styles.sizeTitle}>SELECT SIZE</Text>
           <View style={styles.sizeGrid}>
@@ -274,6 +282,7 @@ const createStyles = (colors: any) =>
     price: { fontSize: 22, fontWeight: "800", color: colors.text, marginRight: 10 },
     discount: { fontSize: 15, color: colors.primary, fontWeight: "600" },
     description: { fontSize: 15, color: colors.textSecondary, lineHeight: 22, marginBottom: 20 },
+    stockText: { fontSize: 14, color: colors.textSecondary, fontWeight: "600", marginBottom: 18 },
     sizeTitle: { fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: 10, letterSpacing: 0.5 },
     sizeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 24 },
     sizeBtn: {

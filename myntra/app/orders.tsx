@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import {
   Package,
   ChevronRight,
+  ChevronLeft,
   MapPin,
   Truck,
   Clock,
@@ -172,7 +173,11 @@ export default function Orders() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <ChevronLeft size={26} color="#3e3e3e" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>My Orders</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.emptyState}>
           <Package size={64} color="#ff3f6c" />
@@ -187,7 +192,11 @@ export default function Orders() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <ChevronLeft size={26} color="#3e3e3e" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>My Orders</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No orders found yet.</Text>
@@ -201,7 +210,11 @@ export default function Orders() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <ChevronLeft size={26} color="#3e3e3e" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Orders</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content}>
@@ -328,16 +341,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
     padding: 15,
     paddingTop: 50,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
   headerTitle: {
+    flex: 1,
     fontSize: 24,
     fontWeight: "bold",
     color: "#3e3e3e",
+  },
+  headerSpacer: {
+    width: 36,
   },
   content: {
     flex: 1,

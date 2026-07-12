@@ -66,6 +66,7 @@ export const removeItem = deleteItemAsync;
 export const RECENTLY_VIEWED_KEY = "myntra_recently_viewed_local";
 export const LOCAL_WISHLIST_KEY = "myntra_local_wishlist";
 export const LOCAL_BAG_KEY = "myntra_local_bag";
+export const LOCAL_ORDERS_KEY_PREFIX = "myntra_local_orders";
 
 export const clearLocalShoppingData = async () => {
   await deleteItemAsync(LOCAL_WISHLIST_KEY);
@@ -85,6 +86,9 @@ export type LocalProductSnapshot = {
   discount?: string;
   images: string[];
   sizes?: string[];
+  stock?: number;
+  isActive?: boolean;
+  isDiscontinued?: boolean;
 };
 
 export type LocalBagItem = {
@@ -94,6 +98,30 @@ export type LocalBagItem = {
   quantity: number;
   section: "active";
   version: number;
+};
+
+export type LocalOrder = {
+  _id: string;
+  date: string;
+  status: string;
+  items: Array<{
+    _id: string;
+    productId: LocalProductSnapshot;
+    size: string;
+    price: number;
+    quantity: number;
+  }>;
+  total: number;
+  shippingAddress: string;
+  paymentMethod: string;
+  tracking: {
+    number: string;
+    carrier: string;
+    estimatedDelivery: string;
+    currentLocation: string;
+    status: string;
+    timeline: Array<{ status: string; location: string; timestamp: string }>;
+  };
 };
 
 const parseJsonArray = <T>(raw: string | null): T[] => {
@@ -114,6 +142,9 @@ const snapshotProduct = (product: LocalProductSnapshot): LocalProductSnapshot =>
   discount: product.discount || "",
   images: Array.isArray(product.images) ? product.images : [],
   sizes: Array.isArray(product.sizes) ? product.sizes : [],
+  stock: Number.isFinite(Number(product.stock)) ? Number(product.stock) : 100,
+  isActive: product.isActive !== false,
+  isDiscontinued: product.isDiscontinued === true,
 });
 
 export const getLocalRecentlyViewed = async (): Promise<LocalRecentlyViewed[]> => {
@@ -208,4 +239,51 @@ export const removeLocalBagItem = async (itemId: string) => {
   const next = items.filter((item) => item._id !== itemId);
   await saveLocalBagItems(next);
   return next;
+};
+
+const localOrdersKey = (userId: string) => `${LOCAL_ORDERS_KEY_PREFIX}_${userId}`;
+
+export const getLocalOrders = async (userId: string): Promise<LocalOrder[]> => {
+  const raw = await getItemAsync(localOrdersKey(userId));
+  return parseJsonArray<LocalOrder>(raw);
+};
+
+export const saveLocalOrder = async (
+  userId: string,
+  items: LocalBagItem[],
+  total: number,
+  shippingAddress: string,
+  paymentMethod = "UPI"
+) => {
+  const now = new Date().toISOString();
+  const order: LocalOrder = {
+    _id: `LOCAL-ORDER-${Date.now()}`,
+    date: now,
+    status: "Delivered",
+    items: items.map((item) => ({
+      _id: `local-order-item-${item.productId._id}-${item.size}`,
+      productId: snapshotProduct(item.productId),
+      size: item.size,
+      price: Number(item.productId.price) || 0,
+      quantity: item.quantity,
+    })),
+    total,
+    shippingAddress,
+    paymentMethod,
+    tracking: {
+      number: `TRK${Date.now()}`,
+      carrier: "Demo Delivery",
+      estimatedDelivery: now,
+      currentLocation: "Delivered",
+      status: "Delivered",
+      timeline: [
+        { status: "Order Confirmed", location: "Online", timestamp: now },
+        { status: "Delivered", location: "Customer Address", timestamp: now },
+      ],
+    },
+  };
+  const existing = await getLocalOrders(userId);
+  const next = [order, ...existing].slice(0, 50);
+  await setItemAsync(localOrdersKey(userId), JSON.stringify(next));
+  return order;
 };
